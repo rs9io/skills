@@ -2,6 +2,9 @@
 
 Agent skills we actually run. First one is `graph`.
 
+Public clone: https://github.com/rs9io/skills  
+Cursor Origin (login): https://cursor.com/codebase/rs9io/skills
+
 ## graph
 
 Graph outside. Loops inside.
