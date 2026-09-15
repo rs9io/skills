@@ -8,6 +8,21 @@ Flash handles the implementation. If its result fails the agreed checks, Pro get
 
 The agent drives the workflow: define a done-check, save the starting files, prompt a rung, apply its proposed edits, verify, and retry or escalate. The Python scripts handle individual API calls and edits. They are not a standalone autonomous service.
 
+## What you will see
+
+Before every model switch, the coordinator posts a **bold, standalone banner** naming the model or rung taking over. Use the exact visible form; for example, escalation to Pro is **--- Escalation to Pro ---**. Immediately underneath, one short sentence gives the specific previous failure reason and the recorded cost, or `unknown`. A runner or configuration fault, such as an accidental token cap, is repaired, announced with **--- Restarting with Flash ---**, and restarted on Flash with the corrected runner instead of jumping to a bigger model. Plain tool output or an end-of-task report is not enough. Nothing should move to the next rung silently.
+
+Example:
+
+**--- Starting with Flash ---**  
+Starting Flash. No prior failure; cost so far $0.00.
+
+**--- Escalation to Pro ---**  
+Flash failed the done-check; recorded cost $0.12.
+
+**--- Restarting with Flash ---**  
+Runner repair fixed an accidental token cap; recorded cost $0.12.
+
 ## Why it can save money
 
 Implementation and failed attempts move to cheaper external models. Your main model still spends tokens understanding the task, writing prompts and checking results, and it handles difficult rescues. Total tokens can increase because of retries. The aim is fewer expensive model tokens and lower overall cost, not a guaranteed saving on every task.

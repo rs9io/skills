@@ -38,7 +38,38 @@ only when a failure taught something specific. Never a third attempt on a rung.
 After Pro fails, continue in the calling chat without asking the user to courier
 anything or approve an already authorised fix.
 
+If a failure came from a demonstrated runner or configuration defect, such as an
+accidental token cap, fix that fault, announce the repair, then restart with
+Flash using the corrected runner. A defect like that is not a model or task
+failure, so it must not justify skipping to Pro or the calling chat once
+repaired. Record all prior costs before restarting. Keep the one-retry limit for
+genuine model or task failures, and do not open an endless repair loop: if the
+same infrastructure fault repeats identically, report it instead of retrying
+silently. The three rungs stay exactly Flash, then Pro, then the current calling
+chat, with no hardcoded rescue name and no separate rescue API.
+
 ## Coordinator discipline
+
+Before the initial Flash call, before every retry, before a restart after a
+runner repair, and before any escalation, the coordinator posts a standalone
+bold user-visible banner naming the model or rung taking over. Use these exact
+visible forms:
+
+- Initial start: `--- Starting with Flash ---`
+- Retry on the actual rung: `--- Retrying Flash ---` or `--- Retrying Pro ---`
+- Restart after runner repair: `--- Restarting with Flash ---`
+- External escalation: `--- Escalation to Pro ---`
+- Final escalation: `--- Escalation to <current chat model> ---`, naming the
+  actual current chat model dynamically. Astra is illustrative only and must
+  never be hardcoded.
+
+Make the banner line bold and standalone; for example,
+`**--- Escalation to Pro ---**` renders as the exact visible form
+`--- Escalation to Pro ---`. Immediately underneath each banner, post one short
+sentence giving the specific previous failure reason and the recorded cost, or
+unknown. A tool log, plain tool output or the final report alone does not
+satisfy this. Never move silently to the next model, and never continue
+implementation on the calling model without announcing it first.
 
 While this skill is executing delegated application work, the coordinator
 writes prompts, runs the runner and patch applier, runs checks, and judges.
@@ -82,9 +113,12 @@ the rescue; the background agent does not choose or launch a replacement.
    incomplete output, invalid edits and failed done-checks are rung evidence.
    The applier validates all edit blocks before writing. Restore the snapshot
    after a failed check before retrying or escalating. Keep edits within scope.
-6. **Judge.** Ship, retry with the newly learned detail, or escalate. Keep one
-   concise progress line per rung. Read focused failures and changed sections,
-   not entire transcripts. Preserve any required independent review and release checks.
+6. **Judge.** Ship, retry with the newly learned detail, or escalate. Before any
+   retry or escalation, post the required standalone bold banner naming the
+   model taking over and, for a retry or escalation, one short sentence with the
+   previous failure reason and the recorded cost, or unknown. Read focused
+   failures and changed sections, not entire transcripts. Preserve any required
+   independent review and release checks.
 7. **Rescue in the calling chat.** Restore the snapshot, retain the useful
    failure findings, and have the current chat model implement and verify the
    fix directly. Do not call OpenRouter, the OpenAI/Codex API, Cursor API, or a
@@ -122,6 +156,11 @@ answer. A `.meta.json` sidecar records cost, token counts, provider and finish
 reason; partial text is kept separately as `.partial.txt` and must not be applied.
 A complete answer still has to pass the edit helper and the task's done-check.
 Never apply a stale output after a failed command. Use a fresh output path for
-each attempt. A justified settings retry counts toward the one-retry-per-rung
-limit; it does not restart the cascade indefinitely. If the provider still
-truncates an answer, split the work into smaller changes or escalate.
+each attempt. Distinguish a task-effort retry, which counts toward the
+one-retry-per-rung limit, from repairing a demonstrated runner fault such as an
+accidental token cap. A runner repair fixes the fault and restarts at Flash with the corrected
+runner after a demonstrated runner repair; it is not a task-effort retry and
+must not be counted as one, though every prior cost is still recorded. Neither kind of retry may restart
+the cascade indefinitely. If the same infrastructure fault repeats identically,
+report it rather than looping. If the provider still truncates an otherwise valid
+attempt, split the work into smaller changes or escalate.
