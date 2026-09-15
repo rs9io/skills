@@ -10,7 +10,7 @@ import urllib.request
 from cascade_apply import parse
 
 MODELS = {
-    "deepseek/deepseek-v4.1-flash": {"effort": "low", "efforts": {"low", "high", "max"}},
+    "deepseek/deepseek-v4.1-flash": {"effort": "high", "efforts": {"low", "high", "max"}},
     "deepseek/deepseek-v4-pro": {"effort": "high", "efforts": {"high", "xhigh"}},
 }
 

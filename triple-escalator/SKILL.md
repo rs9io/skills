@@ -146,9 +146,10 @@ API call and does not override the user's existing approval boundaries.
 
 The runner does not send a token cap. The provider's own defaults and model
 limits still apply, and reasoning shares the completion allowance with the
-answer. Flash explicitly uses low reasoning; Pro uses its supported high level.
-Use `--reasoning-effort high` when the task justifies more reasoning. Check
-supported efforts in the live model catalogue before changing this setting.
+answer. Flash defaults to high reasoning, its second-highest supported effort;
+Pro also uses its supported high level. Use `--reasoning-effort` to pick another
+supported level, such as max for Flash. Check supported efforts in the live
+model catalogue before changing this setting.
 
 `finish_reason: length`, empty content and invalid edit format return a nonzero
 exit code. The usable reply path is written only for a complete, correctly shaped
