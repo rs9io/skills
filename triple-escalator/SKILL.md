@@ -10,10 +10,10 @@ description: >-
 
 # Triple Escalator for Codex
 
-The calling chat coordinates and judges. Flash does the heavy lifting, Pro
-handles failures, and the calling chat's current model performs the final
-rescue directly. If the caller is Astra, Astra rescues. If the caller uses a
-different model, that model rescues. Never hardcode a frontier model.
+The calling chat owns the diagnosis, plan, task boundaries and acceptance
+criteria. Flash does the grunt work: bounded implementation tasks from that
+plan. Pro handles failed implementation tasks, and the calling chat's current
+model performs the final rescue directly. Never hardcode a frontier model.
 
 Read [provider-policy.md](references/provider-policy.md) before sending any
 prompt externally. The runner requires the user's own explicit provider allowlist and applies
@@ -49,6 +49,14 @@ silently. The three rungs stay exactly Flash, then Pro, then the current calling
 chat, with no hardcoded rescue name and no separate rescue API.
 
 ## Coordinator discipline
+
+Planning stays in the calling chat. Never send ownership of the diagnosis,
+implementation plan, scope or success criteria to a worker. Workers may gather
+specified evidence or implement a bounded task, but the caller interprets the
+evidence, makes decisions and judges the result. A request for a plan is handled
+directly by the caller; it does not start the worker cascade or require failed
+worker attempts first. The workflow below applies to implementation after the
+caller has defined the plan and acceptance criteria.
 
 Before the initial Flash call, before every retry, before a restart after a
 runner repair, and before any escalation, the coordinator posts a standalone
