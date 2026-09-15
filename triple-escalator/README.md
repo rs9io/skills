@@ -90,10 +90,9 @@ Start with a small task and inspect the diff and results. Irreversible actions, 
 ## Output and reasoning
 
 The runner imposes no token cap. The provider's defaults and model limits still
-apply. Reasoning tokens count towards the completion allowance, so leaving
-Flash at its default high reasoning can leave less room for the actual edits.
-This runner explicitly uses low reasoning for Flash and high for Pro, which does
-not support low. Use `--reasoning-effort` to select another supported level.
+apply. Reasoning tokens count towards the completion allowance. Flash and Pro
+both default to high reasoning; Flash can also be set to low or max. Use
+`--reasoning-effort` to select another supported level.
 See [OpenRouter's reasoning-token documentation](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
 
 A truncated or empty response fails with a nonzero exit code. It never becomes

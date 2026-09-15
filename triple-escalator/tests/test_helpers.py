@@ -64,7 +64,7 @@ class Helpers(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertNotIn("max_tokens", payload)
         self.assertNotIn("max_completion_tokens", payload)
-        self.assertEqual(payload["reasoning"], {"effort": "low"})
+        self.assertEqual(payload["reasoning"], {"effort": "high"})
         self.assertTrue(payload["provider"]["require_parameters"])
         self.assertIn("reply", files)
         self.assertEqual(json.loads(files["reply.meta.json"])["finish_reason"], "stop")
