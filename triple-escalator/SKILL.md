@@ -152,9 +152,16 @@ API call and does not override the user's existing approval boundaries.
 
 ## Output limits and truncated replies
 
-The runner does not send a token cap. The provider's own defaults and model
-limits still apply, and reasoning shares the completion allowance with the
-answer. Flash defaults to high reasoning, its second-highest supported effort;
+The runner reads the selected endpoint's live output capacity and explicitly
+requests that allowance, reserving context space for the input. It adds no fixed
+application token cap. Omitting max_tokens can silently inherit a small provider
+default, and reasoning shares the completion allowance with the answer.
+Flash currently selects morph/fp8; Pro selects azure/us. Use --provider with an
+exact approved endpoint tag (for example baseten/fp4 for Pro) to test another
+route. Each call is pinned so a fallback cannot silently shrink its allowance.
+If the endpoint is unavailable, record that failure; do not weaken the allowlist,
+zero-retention or no-data-collection controls. Model and endpoint limits still
+exist, so an explicit allowance is not a guarantee against truncation. Flash defaults to high reasoning, its second-highest supported effort;
 Pro also uses its supported high level. Use `--reasoning-effort` to pick another
 supported level, such as max for Flash. Check supported efforts in the live
 model catalogue before changing this setting.
