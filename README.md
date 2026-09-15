@@ -1,9 +1,19 @@
 # RS9 Skills
 
-Agent skills we actually run. First one is `graph`.
+Agent skills we actually run.
 
 Public clone: https://github.com/rs9io/skills  
 Cursor Origin (login): https://cursor.com/codebase/rs9io/skills
+
+## triple-escalator
+
+DeepSeek Flash on OpenRouter does the implementation. If its checks fail,
+DeepSeek Pro gets a turn. If both fail, the model already running your chat
+finishes the work directly. No separate rescue API call, no hardcoded final model.
+
+[Install Triple Escalator](triple-escalator/README.md). Bring your own OpenRouter
+API key and configure your allowed and blocked providers before running it.
+The runner imposes no token cap and rejects truncated replies.
 
 ## graph
 

@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+providers.json
+*.reply.txt
+*.prompt.txt
+__pycache__/
+*.pyc
+.DS_Store
