@@ -72,7 +72,7 @@ Edit `providers.json`. `only` is your **allowlist**. `ignore` is your **blocklis
 
 Those are placeholders, not working provider names. The bundled `only` list starts empty and the runner refuses to send a request until you configure it. `ignore` may be empty because `only` already limits eligible providers. You can also configure ignored providers in [OpenRouter settings](https://openrouter.ai/settings/preferences).
 
-The runner adds `data_collection: "deny"` and `zdr: true` on every request. Fallbacks remain restricted to your `only` list. If no allowed endpoint satisfies these settings, the rung fails; the agent must not relax your rules to make it work. Model availability and provider support can change, so check the current model pages before use:
+The runner adds `data_collection: "deny"` and `zdr: true` on every request. Each call is pinned to an approved endpoint; automatic fallback is disabled so the output allowance cannot silently shrink. If no allowed endpoint satisfies these settings, the rung fails; the agent must not relax your rules to make it work. Model availability and provider support can change, so check the current model pages before use:
 
 - [DeepSeek V4.1 Flash](https://openrouter.ai/deepseek/deepseek-v4.1-flash)
 - [DeepSeek V4 Pro](https://openrouter.ai/deepseek/deepseek-v4-pro)
@@ -89,8 +89,12 @@ Start with a small task and inspect the diff and results. Irreversible actions, 
 
 ## Output and reasoning
 
-The runner imposes no token cap. The provider's defaults and model limits still
-apply. Reasoning tokens count towards the completion allowance. Flash and Pro
+The runner reads the selected endpoint's live output capacity and explicitly
+requests that allowance, reserving context space for the prompt. It adds no
+fixed application token cap. Reasoning counts towards that allowance.
+Flash currently selects `morph/fp8`; Pro selects `azure/us`. Both must be in your
+approved provider list. Use `--provider baseten/fp4` to select another approved
+Pro endpoint. Availability and limits are checked before each call. Flash and Pro
 both default to high reasoning; Flash can also be set to low or max. Use
 `--reasoning-effort` to select another supported level.
 See [OpenRouter's reasoning-token documentation](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).

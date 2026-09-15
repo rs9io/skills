@@ -52,22 +52,44 @@ class Helpers(unittest.TestCase):
             root = Path(d)
             prompt, reply, providers = root / "prompt", root / "reply", root / "providers.json"
             prompt.write_text("Fix the fixture.")
-            providers.write_text('{"only":["approved"]}')
+            providers.write_text('{"only":["morph"]}')
             with patch.dict("os.environ", {"OPENROUTER_API_KEY": "fixture-key", "OPENROUTER_PROVIDER_CONFIG": str(providers)}), patch("sys.argv", ["runner", "deepseek/deepseek-v4.1-flash", str(prompt), str(reply), *extra]), patch("urllib.request.urlopen") as api, patch("sys.stdout", io.StringIO()), patch("sys.stderr", io.StringIO()):
-                api.return_value.__enter__.return_value = io.StringIO(json.dumps(body))
+                endpoint = {"tag":"morph/fp8","max_completion_tokens":943718,"context_length":1048576,"supported_parameters":["max_tokens"]}
+                api.side_effect = lambda request, **kwargs: io.StringIO(json.dumps({"data":{"endpoints":[endpoint]}} if isinstance(request,str) else body))
                 result = runner.main()
                 payload = json.loads(api.call_args.args[0].data)
             return result, payload, {p.name: p.read_text() for p in root.iterdir()}
 
-    def test_complete_reply_has_no_runner_token_cap(self):
+    def test_complete_reply_uses_live_capacity_without_fixed_cap(self):
         result, payload, files = self.invoke_runner(usage={"completion_tokens_details": None})
         self.assertEqual(result, 0)
-        self.assertNotIn("max_tokens", payload)
+        self.assertEqual(payload["max_tokens"], 943718)
+        self.assertEqual(payload["provider"]["only"], ["morph/fp8"])
+        self.assertFalse(payload["provider"]["allow_fallbacks"])
         self.assertNotIn("max_completion_tokens", payload)
         self.assertEqual(payload["reasoning"], {"effort": "high"})
         self.assertTrue(payload["provider"]["require_parameters"])
         self.assertIn("reply", files)
         self.assertEqual(json.loads(files["reply.meta.json"])["finish_reason"], "stop")
+
+    def test_capacity_tracks_catalogue_and_preserves_context(self):
+        routing = {"only":["azure"],"ignore":[],"zdr":True,"data_collection":"deny"}
+        endpoint = {"tag":"azure/us","max_completion_tokens":384000,"context_length":1048576,"supported_parameters":["max_tokens"]}
+        catalogue = {"data":{"endpoints":[endpoint]}}
+        _, allowance = runner.output_route("model", routing, "azure/us", [], catalogue)
+        self.assertEqual(allowance,384000)
+        endpoint["max_completion_tokens"] = 444444
+        _, allowance = runner.output_route("model", routing, "azure/us", [], catalogue)
+        self.assertEqual(allowance,444444)
+        endpoint["context_length"] = 100
+        _, allowance = runner.output_route("model", routing, "azure/us", [], catalogue)
+        self.assertEqual(allowance,98)
+        for tag in ["deepseek", "azure/eu"]:
+            with self.assertRaises(ValueError):
+                runner.output_route("model",routing,tag,[],catalogue)
+        routing["ignore"] = ["azure"]
+        with self.assertRaises(ValueError):
+            runner.output_route("model",routing,"azure/us",[],catalogue)
 
     def test_truncation_preserves_evidence_without_usable_reply(self):
         result, _, files = self.invoke_runner(finish="length", usage={"completion_tokens": 32000, "completion_tokens_details": {"reasoning_tokens": 20000}})
