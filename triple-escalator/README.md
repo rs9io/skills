@@ -2,30 +2,43 @@
 
 A skill for Codex, Claude Code and Cursor that keeps cheaper workers on the same PR until the work is finished.
 
-**DeepSeek Flash on OpenRouter → DeepSeek Pro on OpenRouter → your current chat model.**
+**Default: parent → DeepSeek Pro on OpenRouter → parent.**
 
-Flash uses OpenCode to inspect the repository, edit files, run commands and tests, and repair failures inside its own tool loop. If its result fails the agreed checks, Pro gets a turn. If both fail, the model already running your chat finishes the work directly. There is no separate frontier API call or fixed rescue-model name.
+The parent may choose Flash for small, mechanical tasks with clear checks. Both
+workers use OpenCode to read source, edit files, run tests and repair failures.
+Either worker returns directly to the parent. There is no Flash-to-Pro escalation.
+The parent plans, checks the actual diff and finishes work the selected worker
+cannot complete after one justified corrective run.
 
-The original parent owns the plan and acceptance checks. One generalist Flash worker keeps its conversation through tasks, retries and corrections. Pro gets its own reusable conversation when needed. The parent reads the actual diff and failure evidence before each escalation, and passes accepted corrections back to Flash.
+One generalist worker keeps its native conversation through the PR. Reuse it for
+feedback and later assignments; saved context is not training. Idle sessions make
+no API calls. Do not create both worker sessions for every task or replay the full
+parent transcript. Version 0.9 changes routing; existing installation paths and
+histories remain compatible. The skill still appears as `triple-escalator`.
 
-The parent writes the plan and judges the result. The Python adapter manages native worker sessions and enforces routing; OpenCode handles routine file and terminal work. The parent does not relay each command or apply worker patches. Workers have no background process or idle API cost. Persistence means saved context, not model training.
-
-Version 0.8.0 adds full coding workers. Version 0.7 retained conversations but still generated patches, leaving file handling and test execution with the parent. A host-specific rescue override is allowed, such as choosing Fable for Cursor while Codex and Claude return to their original parent. Public installations inherit their original parent unless their user configures an override.
+Codex and Claude return to their originating conversation and host-selected model.
+A configured host rescue override remains valid, such as Fable in Cursor. No extra
+frontier API call is made by this runner.
 
 ## What you will see
 
-Before every model switch, the coordinator posts a **bold, standalone banner** naming the model or rung taking over. Use the exact visible form; for example, escalation to Pro is **--- Escalation to Pro ---**. Immediately underneath, one short sentence gives the specific previous failure reason and the recorded cost, or `unknown`. A runner or configuration fault, such as an accidental token cap, is repaired, announced with **--- Restarting with Flash ---**, and restarted on Flash with the corrected runner instead of jumping to a bigger model. Plain tool output or an end-of-task report is not enough. Nothing should move to the next rung silently.
+Before starting, resuming or escalating, the parent posts a standalone bold banner
+and one sentence with the reason and recorded cost, or `unknown`:
 
-Example:
+**--- Starting with Pro ---**
 
-**--- Starting with Flash ---**  
-Starting Flash. No prior failure; cost so far $0.00.
+Pro is the default for this debugging task; recorded cost so far $0.00.
 
-**--- Escalation to Pro ---**  
-Flash failed the done-check; recorded cost $0.12.
+**--- Starting with Flash ---**
 
-**--- Restarting with Flash ---**  
-Runner repair fixed an accidental token cap; recorded cost $0.12.
+This is a prescribed mechanical edit with clear checks; recorded cost so far $0.00.
+
+**--- Escalation to the originating parent ---**
+
+The selected worker still fails the acceptance check after correction; recorded cost $0.12.
+
+Harness faults are repaired and the same worker resumes. They do not trigger a
+switch to the other model. Workers never delegate to each other.
 
 ## Why it can save money
 
@@ -86,7 +99,7 @@ Edit `providers.json`. `only` is your **allowlist**. `ignore` is your **blocklis
 
 Those are placeholders, not working provider names. The bundled `only` list starts empty and the runner refuses to send a request until you configure it. `ignore` may be empty because `only` already limits eligible providers. You can also configure ignored providers in [OpenRouter settings](https://openrouter.ai/settings/preferences).
 
-The runner adds `data_collection: "deny"` and `zdr: true` on every request. Each call is pinned to an approved endpoint; automatic fallback is disabled so the output allowance cannot silently shrink. If no allowed endpoint satisfies these settings, the rung fails; the agent must not relax your rules to make it work. Model availability and provider support can change, so check the current model pages before use:
+The runner adds `data_collection: "deny"` and `zdr: true` on every request. Each call is pinned to an approved endpoint; automatic fallback is disabled so the output allowance cannot silently shrink. If no allowed endpoint satisfies these settings, the worker call fails; the agent must not relax your rules to make it work. Model availability and provider support can change, so check the current model pages before use:
 
 - [DeepSeek V4.1 Flash](https://openrouter.ai/deepseek/deepseek-v4.1-flash)
 - [DeepSeek V4 Pro](https://openrouter.ai/deepseek/deepseek-v4-pro)
@@ -97,15 +110,17 @@ For a config stored outside the installed skill, set `OPENROUTER_PROVIDER_CONFIG
 
 Ask your coding agent:
 
-> Use triple-escalator to fix this issue. Define the done-check first, start with Flash, try Pro if Flash fails, and finish in this chat if both fail. Preserve my existing changes and report the checks and cost per rung.
+> Use triple-escalator to fix this issue. Define acceptance first and use Pro by default. Choose Flash only for clearly mechanical work. The selected worker returns to this chat for review and rescue; do not chain Flash to Pro. Preserve my edits and report checks and total available cost.
 
-The parent creates one session directory **outside the repository**, records its path, and resumes it for later tasks. Use `cascade_agent.py flash task.md --session /private/path/pr-session --task issue-123`. It restores the same native worker, which executes the work itself. The old patch runner is reserved for legacy diagnostics. Follow [session commands](references/sessions.md) for initialisation, feedback, handovers and compaction. Closing a session preserves its journal.
+The parent creates one session directory **outside the repository**, records its path, and resumes it for later tasks. Use `cascade_agent.py pro task.md --session /private/path/pr-session --task issue-123`. It restores the same native worker, which executes the work itself. The old patch runner is reserved for legacy diagnostics. Follow [session commands](references/sessions.md) for initialisation, feedback, handovers and compaction. Closing a session preserves its journal.
 
 Start with a small task and inspect the diff and results. Irreversible actions, payment or credential work, restricted data, and tasks without a reliable done-check stay in the calling chat, subject to your usual approvals.
 
 ## Measurements without extra model calls
 
 Each request records API-reported input/output tokens and cost. Existing checks supply pass/fail results and short failure tags. A local summary counts repeated mistakes and elapsed time from the first external request to the first passing check for each task. Reasoning tokens are not counted twice. Missing usage stays unknown; parent-chat usage is separate and is not measured by this runner.
+
+When comparing policies, freeze the baseline before switching routes and retain the same acceptance checks and fixed samples. Include parent repairs and reviewer work where measurable; cached input, fresh input and output are separate counters. Missing billing stays unknown. Report learning, task differences and downtime as confounders; a before-and-after trial does not prove causal savings. Do not rerun a solved task just to claim an easy win.
 
 Read the summary at PR completion or when requested. There are no model graders, benchmark reruns or dashboards. These counters make comparison possible; they do not prove savings by themselves. Long histories also cost input tokens, so the parent can write a concise checkpoint while the original journal remains intact.
 

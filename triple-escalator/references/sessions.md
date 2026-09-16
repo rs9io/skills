@@ -1,6 +1,6 @@
 # Coding workers: setup and commands
 
-Version 0.8 uses a real coding harness. The parent writes a plan and checks the
+Version 0.9 uses parent-selected workers in a real coding harness. The parent writes a plan and checks the
 result; workers read/edit files and run their own terminal/test/fix loops.
 
 ## Setup (macOS)
@@ -46,7 +46,7 @@ progress record. Use a task-specific path, not a new directory per turn.
 python3 "$SKILL/scripts/cascade_session.py" init /private/path/pr-session \
   --repo /path/to/worktree --parent original-conversation-reference \
   --parent-model inherit --file /private/path/parent-plan.md
-python3 "$SKILL/scripts/cascade_agent.py" flash /private/path/task.md \
+python3 "$SKILL/scripts/cascade_agent.py" pro /private/path/task.md \
   --session /private/path/pr-session --task issue-123
 ```
 
@@ -68,7 +68,7 @@ A second generalist worker is an exception. Use a separate checkout and PR-scope
 session path with the same plan/decisions; initialise it with `--second-worker` and
 select `flash-2`. Share accepted corrections, never concurrent writes in one checkout.
 
-## Review, resume and escalate
+## Review, resume and return to the parent
 
 Inspect the actual diff (including committed changes since the task baseline),
 relevant tool output and result. `returned` is not a pass verdict. Record parent
@@ -78,7 +78,7 @@ acceptance or a concrete failure:
 python3 "$SKILL/scripts/cascade_session.py" parent-check /private/path/pr-session \
   --task issue-123 --result fail --failure-tag wrong-pack-basis \
   --detail 'Observed regression: six-pack price treated as single bottle'
-python3 "$SKILL/scripts/cascade_agent.py" flash /private/path/feedback.md \
+python3 "$SKILL/scripts/cascade_agent.py" pro /private/path/feedback.md \
   --session /private/path/pr-session --task issue-123
 ```
 
@@ -87,22 +87,23 @@ history to retry. If a run was interrupted, inspect its logs and working tree be
 resuming; don't assume its edits rolled back. Only a successfully recorded native
 binding may be resumed automatically; investigate any interrupted first-run binding.
 
-When escalation is justified, announce it and assemble the handover:
+When the selected worker cannot finish, announce return to the originating parent
+(or configured host rescue), then assemble the evidence:
 
 ```sh
 python3 "$SKILL/scripts/cascade_session.py" handoff /private/path/pr-session \
   --task issue-123 > /private/path/handoff.json
-python3 "$SKILL/scripts/cascade_agent.py" pro /private/path/pro-task.md \
-  --session /private/path/pr-session --task issue-123
 ```
 
-The parent reads the handover and diff, then writes `pro-task.md` with the relevant
-failed approaches, retained edits, check evidence and acceptance goal. It need not
-copy entire files. Handoff includes coding reports and tool-result excerpts; full
-logs remain linked. Its HEAD diff excludes committed edits and untracked contents,
-which the parent must also inspect. Pro reuses its own native session on later runs.
+`handoff` exports evidence to the parent; it never launches another worker.
+The parent reads the actual diff and report and finishes the work. Do not dispatch
+Pro because Flash failed, or Flash because Pro failed. Pro is selected directly for
+new work by default. For a new mechanical task the parent may explicitly use `flash`
+in the same command instead of `pro`, reusing its native binding if one exists.
+The report excludes committed changes from its HEAD diff and does not include
+untracked file contents; inspect those separately.
 
-After a Pro or parent fix, send accepted corrections back to the workers:
+After an accepted worker or parent fix, send accepted corrections back to the workers:
 
 ```sh
 python3 "$SKILL/scripts/cascade_session.py" note /private/path/pr-session \
