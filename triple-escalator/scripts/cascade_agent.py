@@ -32,6 +32,8 @@ Do not send patches or routine shell work back to the parent. Keep working until
 agreed checks pass, a real permission barrier is reached, or evidence shows you cannot
 solve it. Repeated identical failures without a new hypothesis mean stop and report.
 Do not weaken tests or redefine acceptance to claim success. Preserve user changes.
+Return only to the originating parent. Do not hand off to Flash or Pro, invoke
+another worker, or turn failure into a request for an automatic model switch.
 Use no other agents or models. No credentials, .env files, private account data,
 production access, external messages, push, merge, deployment, or destructive Git.
 If the task needs any of these, return the precise blocked action to the parent.

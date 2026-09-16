@@ -1,20 +1,32 @@
 ---
 name: triple-escalator
 description: >-
-  Delegate implementation to persistent Flash and Pro coding agents with file,
-  terminal and test tools. The originating parent plans, reviews and rescues.
-  Use when asked for triple escalator or the cheap-first coding cascade.
+  Delegate implementation to a persistent Pro coding agent, or Flash for a
+  parent-selected mechanical task. Workers return directly to the originating
+  parent for review and rescue. Use for triple escalator or double escalation.
 metadata:
-  version: "0.8.2"
+  version: "0.9.0"
 ---
 
 # Triple Escalator
 
-The originating parent owns the problem, plan, acceptance criteria and final review.
-**Flash is a full coding worker:** it explores the repo, reads source, edits files,
-runs commands and tests, diagnoses failures and repairs its work. Pro takes over
-when Flash cannot finish. The parent must not become a courier for file contents,
-patches, individual commands or routine test failures.
+The originating parent plans, selects a worker, reviews and rescues.
+**Pro is the default coding worker.** The parent may choose Flash up front for
+small mechanical work with clear checks, such as a prescribed rename or a repetitive
+edit with no unresolved design. Use Pro for debugging, uncertain requirements,
+cross-file changes and correctness-sensitive implementation. If unsure, choose Pro.
+Both are full coding agents with file, terminal, test and repair tools.
+
+**Routes: parent → Pro → parent, or parent → Flash → parent.** There is no
+Flash → Pro ladder. Neither worker delegates, chooses a replacement model or
+hands work to the other. If the chosen worker cannot finish, the parent takes over
+(subject to the host rescue override). Do not manufacture a new task to pass the
+same failed implementation to the other worker. Flash remains available as an
+explicit choice, never as a compulsory cheap first attempt.
+
+The name and installation path `triple-escalator` remain for compatibility.
+Existing worker histories stay intact; no rename, duplicate skill or session reset
+is needed. This policy supersedes older Flash-first instructions in saved briefs.
 
 Resolve `SKILL` to this loaded skill's absolute directory. Read
 [worker commands](references/sessions.md) for setup and execution, and
@@ -27,9 +39,11 @@ OpenRouter. **The old `cascade_run.py`/`cascade_apply.py` patch path is a legacy
 protocol diagnostic, not the implementation workflow.** Do not silently fall back
 to patch generation or parent-driven shell relays if the coding harness is broken.
 
-- One persistent generalist Flash per PR/workstream. Reuse its native session ID
-  through assignments, review feedback and host restarts.
-- Start one persistent Pro only when escalation is warranted, then reuse it.
+- One persistent generalist for the selected model per PR/workstream. Reuse its
+  native session ID through assignments, feedback and host restarts. Start Pro
+  directly by default; no failed Flash run is required.
+- Keep an existing Flash session idle when choosing Pro for new independent work.
+  Do not initialise both models merely because both are available.
 - An optional second generalist Flash needs independent scope and a separate
   checkout/session directory. No specialist swarm or nested model delegation.
 - Keep history after completion. Closing marks the PR finished; it does not delete
@@ -55,32 +69,28 @@ Updating this skill does not require recursively delegating its own update.
 
 ## Workflow
 
-1. **Parent plans.** Define the outcome, boundaries, relevant settled decisions and
-   acceptance checks. Create/reuse the PR session. Identify restricted operations
-   that stay with the parent. Do not make the worker invent the product plan.
-2. **Worker executes.** Give Flash the task and file/worktree pointers. Let it run
-   the baseline, inspect source, implement, test and repair autonomously. Ordinary
-   failing tests belong inside its tool loop, not in a new parent conversation turn.
-3. **Worker returns evidence.** Its report names the actual changes, commands,
-   results, remaining problems and decisions it could not settle. The runner saves
-   tool output, native session identity and actual API usage. `returned` means the
-   run ended, not that the task passed or is accepted.
+1. **Parent plans and routes.** Define the outcome, boundaries, settled decisions
+   and acceptance checks. Select Pro by default; record one sentence if choosing
+   Flash. Create/reuse the PR session. Restricted actions stay with the parent.
+2. **Worker executes.** Give the selected worker the task and checkout pointers.
+   It reads source, implements, runs checks and repairs failures in its own tool
+   loop. The parent does not ferry source, patches or routine commands.
+3. **Worker returns to the parent.** Report actual changes, exact check results,
+   remaining failures and decisions needing judgement. Save native session identity,
+   tool evidence and API usage. `returned` is not acceptance. Never hand off to or
+   recommend automatically invoking the other external worker.
 4. **Parent judges.** Read the actual diff, including committed and untracked work,
-   and the relevant execution evidence. Independently test the acceptance risks
-   that warrant review. Do not rerun every routine check just to repeat the worker.
-   A report saying "all green" is not acceptance; use observed results.
-5. **Retry or escalate.** A bounded worker run can contain many tool/test/fix steps.
-   Allow one run and one justified corrective run per rung for the same task.
-   Stop repeated identical failures without a new hypothesis. A blocked permission,
-   missing input or harness fault is not proof of model failure and must not be
-   bypassed by changing model. Fix infrastructure and resume the same Flash session.
-6. **Pro takes over the work.** Before escalation, the parent reads the current diff
-   and failure evidence. Give Pro the goal, attempted fixes, rejected approaches,
-   valid edits to retain and exact remaining failures. Pro then uses its own tools
-   to continue in that checkout. Do not reset valid work or erase unrelated edits.
-7. **Parent rescue last.** If Pro fails, the original parent reads the handover and
-   finishes directly, subject to the host override. Send accepted Pro/parent
-   corrections back into the shared brief/notes before Flash's next assignment.
+   and execution evidence. Independently verify material acceptance risks. Keep
+   required independent review. Do not repeat every already-passing check.
+5. **One justified correction or parent rescue.** A run may contain many tool and
+   repair steps. Allow at most one corrective run with the same worker when there
+   is a concrete new hypothesis. Repeated identical failure, a second failed run
+   or poor economics goes directly to the originating parent, not the other worker.
+   A provider, harness or permission fault is not model failure: repair the cause
+   and resume the same session without bypassing controls.
+6. **Parent finishes.** Read the failure report and diff, retain valid work and
+   repair the remaining issue directly, subject to the host rescue override.
+   Record accepted corrections in the shared brief before the worker's next task.
 
 The wrapper serialises writers in one checkout. Do not run another coding agent
 there concurrently. It does not protect against unrelated processes editing files.
@@ -94,11 +104,10 @@ merely to get a passing result.
 Before starting, retrying, restarting or escalating, post a standalone bold banner
 and one sentence with the reason and known cost, or `unknown`:
 
-- `**--- Starting with Flash ---**`
-- `**--- Continuing with Flash ---**`
+- `**--- Starting with Pro ---**` (default) or `**--- Starting with Flash ---**`
+- `**--- Continuing with Pro ---**` or `**--- Continuing with Flash ---**`
 - `**--- Retrying Flash ---**` or `**--- Retrying Pro ---**`
-- `**--- Restarting with Flash ---**` after a harness repair
-- `**--- Escalation to Pro ---**`
+- `**--- Restarting with Pro ---**` or `**--- Restarting with Flash ---**` after a harness repair
 - `**--- Escalation to <originating parent model> ---**`
 
 If the parent's model is unavailable, name the originating parent instead of
@@ -122,9 +131,28 @@ provides it. Do not claim savings from cheap worker tokens alone.
 
 No extra LLM graders, dashboards or benchmark reruns just to fill counters. Inspect
 metrics at PR completion or when asked. Preserve required independent review.
-Both external rungs use high reasoning by default. Every wire request receives the
+Both external workers use high reasoning by default. Every wire request receives the
 approved endpoint's live output allowance, adjusted for input context, so harness
 SDK defaults cannot impose a hidden fixed token cap. Provider limits still exist.
+
+### Comparing routing policies when requested
+
+Freeze the old run's journal, revision, task and acceptance results before starting
+the new route. Record the new route, chosen model and starting revision in a note.
+Use the same correctness checks and fixed evaluation sample; count failures,
+unknown results and parent repairs. Never improve the denominator or weaken checks.
+Compare cost per accepted task, fresh and cached input, output tokens, failed calls,
+corrective runs, review defects and elapsed time to acceptance. Include available
+parent and reviewer usage; mark missing attribution or dollar cost unknown. Separate
+provider/harness faults and downtime from coding quality, but retain their costs.
+A cheaper run with worse accepted quality is a regression, not a win.
+
+A before-and-after trial has learning and task-difficulty confounders. Say so. Do not
+claim causal savings from it or rerun a known fix as a fresh benchmark. Prefer normal
+work and passive logs. If a controlled replay is explicitly requested, freeze the
+same starting source, brief and checks in isolated checkouts, preserve all histories,
+and agree a small spend limit before running it. No extra model graders or broad
+benchmark framework. Report improvement, regression or inconclusive with evidence.
 
 ## Provider reliability and pending decisions
 
