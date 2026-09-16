@@ -23,6 +23,7 @@ def profile(repo, runtime, executable, ports, read_dirs=()):
         if path in (Path('/'), Path.home()) or not path.is_dir():
             raise ValueError("Extra reads must name a specific existing dependency directory.")
         read.add(path)
+    package_metadata = [parent / 'package.json' for parent in repo.parents]
     git_dir = Path(subprocess.check_output(['git','-C',str(repo),'rev-parse','--path-format=absolute','--git-common-dir'],text=True).strip())
     write = {repo, runtime, git_dir}
     read.add(git_dir)
@@ -33,6 +34,7 @@ def profile(repo, runtime, executable, ports, read_dirs=()):
         '(deny file-read* file-write* network* signal)',
         '(allow signal (target same-sandbox))',
         '(allow file-read-metadata)',
+        '(allow file-read* (literal "/private/etc/hosts") '+ ' '.join('(literal '+q(p)+')' for p in package_metadata)+')',
         '(allow file-read* '+rule(read)+')',
         '(allow file-read* (literal "/") (literal "/private") (literal "/private/etc") (subpath "/private/etc/ssl") (literal "/private/etc/localtime"))',
         '(allow file-write* '+rule(write)+' (literal "/dev/null") (literal "/dev/tty"))',
