@@ -64,12 +64,11 @@ class Bridge:
             raise ValueError("Unexpected model request; no silent worker or helper-model substitution.")
         if self.budget is not None and (self.unknown or self.cost >= self.budget):
             raise ValueError("Canary budget reached or billing unknown. Stop before another request.")
-        # Include tool schemas and every message in the context reservation.
-        reserve = [{"role": "user", "content": json.dumps(body, ensure_ascii=False)}]
-        route, allowance = output_route(self.model, self.provider, self.tag, reserve, self.catalogue)
         body.pop("max_completion_tokens", None)
         body.pop("reasoning_effort", None)
-        body.update(provider=route, reasoning={"effort": self.effort}, max_tokens=allowance)
+        body["reasoning"] = {"effort": self.effort}
+        route, allowance = output_route(self.model, self.provider, self.tag, [], self.catalogue, request=body)
+        body.update(provider=route, max_tokens=allowance)
         body["stream_options"] = {"include_usage": True}
         return body
 

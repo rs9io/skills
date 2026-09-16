@@ -85,7 +85,7 @@ class Helpers(unittest.TestCase):
         self.assertEqual(allowance,444444)
         endpoint["context_length"] = 100
         _, allowance = runner.output_route("model", routing, "azure/us", [], catalogue)
-        self.assertEqual(allowance,98)
+        self.assertEqual(allowance,100)
         for tag in ["deepseek", "azure/eu"]:
             with self.assertRaises(ValueError):
                 runner.output_route("model",routing,tag,[],catalogue)

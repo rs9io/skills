@@ -45,7 +45,7 @@ class CodingAgentTests(unittest.TestCase):
         thread = threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         # Use an opener bound before patching the upstream transport.
         opener = urllib.request.build_opener()
-        req=urllib.request.Request(f'http://127.0.0.1:{server.server_port}/chat/completions',data=json.dumps({'model':MODEL,'messages':[]}).encode(),headers={'Authorization':'Bearer '+self.bridge.token})
+        req=urllib.request.Request(f'http://127.0.0.1:{server.server_port}/chat/completions',data=json.dumps({'model':MODEL,'messages':[{'role':'user','content':'task'}]}).encode(),headers={'Authorization':'Bearer '+self.bridge.token})
         try:
             with patch('cascade_agent.urllib.request.urlopen',return_value=Upstream(data,content_type)):
                 with opener.open(req,timeout=5) as response:result=response.read()
@@ -64,9 +64,11 @@ class CodingAgentTests(unittest.TestCase):
         self.assertEqual(body['tools'][0]['function']['name'],'bash')
 
     def test_wire_reserves_context_for_tool_schemas(self):
-        body=self.bridge.prepare({'model':MODEL,'messages':[], 'tools':[{'description':'x'*400000}]})
-        self.assertLess(body['max_tokens'],943718)
-        self.assertGreater(body['max_tokens'],600000)
+        from cascade_tokens import input_tokens
+        request={'model':MODEL,'messages':[{'role':'user','content':'task'}], 'tools':[{'type':'function','function':{'name':'bash','description':'use this tool ' * 80000}}]}
+        expected=input_tokens(MODEL, request)
+        body=self.bridge.prepare(request)
+        self.assertEqual(body['max_tokens'],1048576-expected)
 
     def test_model_switch_and_unapproved_provider_fail(self):
         with self.assertRaises(ValueError): self.bridge.prepare({'model':'wrong','messages':[]})

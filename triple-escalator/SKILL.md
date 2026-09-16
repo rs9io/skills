@@ -5,7 +5,7 @@ description: >-
   terminal and test tools. The originating parent plans, reviews and rescues.
   Use when asked for triple escalator or the cheap-first coding cascade.
 metadata:
-  version: "0.8.1"
+  version: "0.8.2"
 ---
 
 # Triple Escalator
