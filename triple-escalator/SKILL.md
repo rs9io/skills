@@ -5,7 +5,7 @@ description: >-
   parent-selected mechanical task. Workers return directly to the originating
   parent for review and rescue. Use for triple escalator or double escalation.
 metadata:
-  version: "0.9.0"
+  version: "0.9.1"
 ---
 
 # Triple Escalator
@@ -128,6 +128,8 @@ Unknown cost/tokens remain unknown. Worker tool logs and parent acceptance are s
 Use stable failure tags when recording repeated mistakes. Measure elapsed time to
 acceptance and total available cost/tokens, including parent work when the host
 provides it. Do not claim savings from cheap worker tokens alone.
+
+Do not impose arbitrary dollar cutoffs on coding workers. Track actual spend and let the worker finish its implementation and checks. Stop for a real failure loop, a user-set spending limit or an unresolved safety boundary. Benchmarking alone is not a reason to add `--budget`. A separately authorised paid application canary may still have its own cap; it does not cap the coding agent.
 
 No extra LLM graders, dashboards or benchmark reruns just to fill counters. Inspect
 metrics at PR completion or when asked. Preserve required independent review.

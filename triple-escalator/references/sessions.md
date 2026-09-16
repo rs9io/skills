@@ -129,9 +129,12 @@ python3 "$SKILL/scripts/cascade_session.py" close /private/path/pr-session \
 A worker has a one-hour wall-time stop by default (`--timeout` changes seconds); its
 history remains available for resume. This is not a token limit.
 
-A canary can use `--budget 0.25` to stop before another request once known cost reaches
-that amount, or cost is unknown. This is a between-request stop, not a hard bill cap:
-an in-flight request can exceed it. It never reduces token output allowance.
+Omit `--budget` for ordinary coding work and routing benchmarks. Do not add a small
+arbitrary cutoff that interrupts implementation or checks. The optional `--budget`
+exists for an explicit user-set worker spending limit. It stops between requests
+once known cost reaches that amount or billing is unknown; an in-flight request
+can exceed it. It never reduces token output allowance. Monitor spend and stop
+actual failure loops instead of forcing repeated budget pauses.
 
 Close preserves every transcript and prevents new dispatches. There is no idle
 worker process or paid background polling. A running call must be supervised by its
