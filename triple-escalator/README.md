@@ -15,7 +15,7 @@ unfinished work only when it cannot finish or needs a decision/access outside it
 scope. The parent reviews the result, handles release boundaries and rescues real
 failures. Pro is outside the active route. Reuse the same Flash session for feedback
 and later assignments; saved context is not training. Idle sessions make no calls.
-Version 1.1 preserves existing installation paths and all worker histories.
+Version 1.1.1 preserves existing installation paths and all worker histories.
 
 Codex and Claude return to their originating conversation and host-selected model.
 A configured host rescue override remains valid, such as Fable in Cursor. No extra
@@ -147,11 +147,13 @@ background task no longer stays blank until it finishes. Status includes the
 provider, elapsed time, requests, known cost and last tool type. It does not expose
 source or credentials, and its JSON completion report remains on stdout.
 
-In Codex, the parent uses a native supervisor to show the existing Flash worker in
-the agent list and receive its completion. The supervisor only manages that process;
-Flash still does the coding in its existing session. If the parent needs to end its
-turn, it sets a host heartbeat for completion or failure and pauses it afterwards.
-Other hosts use their own supported background-task notification or stay attached.
+In Codex, a lightweight native Luna supervisor launches the existing Flash worker
+and returns its completion through the native agent channel. The parent keeps its
+turn active: it does independent work, then waits for that event. There is no
+scheduled polling and no need for the user to ask whether the worker finished.
+The supervisor retains no separate coding context and is reused across runs.
+Other hosts use their supported native completion event or stay attached to the
+process. Available status UI depends on the host; the skill cannot add a widget.
 
 ## Data sovereignty
 

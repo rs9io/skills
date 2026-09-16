@@ -1,6 +1,6 @@
 # Coding workers: setup and commands
 
-Version 1.1 uses one persistent Flash coding worker at max reasoning. The parent
+Version 1.1.1 uses one persistent Flash coding worker at max reasoning. The parent
 writes a plan that covers component interactions and acceptance. Flash implements,
 self-reviews, tests and repairs the work before returning a completion report.
 Unfinished work returns only for a concrete blocker or inability to finish.
@@ -137,7 +137,8 @@ actual failure loops instead of forcing repeated budget pauses.
 
 Close preserves every transcript and prevents new dispatches. There is no idle
 worker process or paid background polling. A running call must be supervised by its
-parent; don't end the parent task while it is still running without a resume path.
+parent. Keep the parent turn active until native completion is handled; a resume
+path preserves recovery information but never substitutes for the active wait.
 
 ## Legacy path
 
@@ -146,17 +147,23 @@ diagnostics. They are not full coding agents. Do not use them for application wo
 
 ## Codex supervisor
 
-Use the host native agent tool for a bounded lifecycle task while the parent does
-independent work. Give the supervisor the exact existing session, task file,
-provider and run command. It may launch the runner once, or attach to the known
-process, then wait for its report and return that report. It does not implement,
-review or fork the Flash conversation. Persist the supervisor ID and exec/run IDs
-in the resume note. On every resume inspect the actual process and report first.
-Use `status.json` for display only; verify a stale running status against its PID
-and exact command, and distinguish completion from unexpected process death.
+Create one lightweight native Luna lifecycle supervisor while the parent does
+independent work. Give it the exact existing session, task file, provider and run
+command. It launches the runner once or attaches to the known process, waits for
+exit with the process tool, reads the report, and returns via the native agent
+completion event. It does not implement, review or fork the Flash conversation.
+Use a short prompt without the parent transcript, and reuse this same supervisor.
+Persist supervisor/run/exec IDs for recovery. Inspect process and report before
+any resume, and never relaunch an already running worker.
 
-If returning to the user before completion, use the supported thread heartbeat
-so this same parent resumes without a user message. Inspect existing automations
-before creating one, avoid duplicates, stay quiet while unchanged, and pause the
-heartbeat when its completion has been handled. A native child return alone must
-not be described as a guaranteed wake-up after the parent turn has ended.
+Keep the parent turn active while the supervisor runs. After independent work,
+use the native agent wait tool; the child completion wakes that wait. A final
+answer ends the parent turn and must not be used as a pretend background wait.
+Do not create a heartbeat or scheduled poll as a substitute. Scheduling is for
+user-requested later work, not ordinary worker completion. If native completion
+cannot be used, stay attached to the real process and report that host limitation.
+
+status.json and periodic stderr are diagnostic progress only. Check a stale
+running status against its PID and exact command; report.json distinguishes a
+finished return from unexpected process death. Never promise an agent card or
+spinner the user cannot actually see.
