@@ -105,6 +105,19 @@ class CodingAgentTests(unittest.TestCase):
         self.assertEqual(self.session.summary()['known_cost_usd'],0.002)
         self.assertEqual(self.session.summary()['checks_passed'],0)
 
+
+    def test_flash_policy_defaults_to_max_without_spend_cap(self):
+        import cascade_agent
+        with patch('sys.argv', ['agent', 'flash', 'task.md', '--session', '/unused', '--task', 'example']), patch.object(cascade_agent, 'run', return_value=0) as execute:
+            self.assertEqual(cascade_agent.main(), 0)
+        args = execute.call_args.args[0]
+        self.assertEqual(args.reasoning, 'max')
+        self.assertIsNone(args.budget)
+        self.bridge.effort = args.reasoning
+        body = self.bridge.prepare({'model': MODEL, 'messages': [{'role': 'user', 'content': 'task'}], 'reasoning': {'effort': 'low'}})
+        self.assertEqual(body['reasoning'], {'effort': 'max'})
+        self.assertEqual(body['max_tokens'], 943718)
+
     def test_canary_budget_stops_between_calls_without_token_cap(self):
         self.bridge.budget=0.1;self.bridge.cost=0.1
         with self.assertRaises(ValueError):self.bridge.prepare({'model':MODEL})

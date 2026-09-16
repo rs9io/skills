@@ -1,20 +1,21 @@
 # Triple Escalator
 
-A skill for Codex, Claude Code and Cursor that keeps cheaper workers on the same PR until the work is finished.
+A skill for Codex, Claude Code and Cursor that keeps one coding worker on a workstream until its implementation is finished.
 
-**Default: parent → DeepSeek Pro on OpenRouter → parent.**
+**Route: parent → DeepSeek Flash at max reasoning → parent.**
 
-The parent may choose Flash for small, mechanical tasks with clear checks. Both
-workers use OpenCode to read source, edit files, run tests and repair failures.
-Either worker returns directly to the parent. There is no Flash-to-Pro escalation.
-The parent plans, checks the actual diff and finishes work the selected worker
-cannot complete after one justified corrective run.
+The parent invests in a clear implementation plan: how the components fit together,
+what must stay true, and what evidence proves the job works. One persistent Flash
+coding agent reads and edits source, runs terminal commands, self-reviews its diff,
+and fixes its tests and acceptance checks. It handles the whole implementation,
+including debugging and integration, without handing routine chores back.
 
-One generalist worker keeps its native conversation through the PR. Reuse it for
-feedback and later assignments; saved context is not training. Idle sessions make
-no API calls. Do not create both worker sessions for every task or replay the full
-parent transcript. Version 0.9 changes routing; existing installation paths and
-histories remain compatible. The skill still appears as `triple-escalator`.
+Flash delivers a completion report when the assigned work passes. It returns
+unfinished work only when it cannot finish or needs a decision/access outside its
+scope. The parent reviews the result, handles release boundaries and rescues real
+failures. Pro is outside the active route. Reuse the same Flash session for feedback
+and later assignments; saved context is not training. Idle sessions make no calls.
+Version 1.0 preserves existing installation paths and all worker histories.
 
 Codex and Claude return to their originating conversation and host-selected model.
 A configured host rescue override remains valid, such as Fable in Cursor. No extra
@@ -25,20 +26,16 @@ frontier API call is made by this runner.
 Before starting, resuming or escalating, the parent posts a standalone bold banner
 and one sentence with the reason and recorded cost, or `unknown`:
 
-**--- Starting with Pro ---**
+**--- Continuing with Flash ---**
 
-Pro is the default for this debugging task; recorded cost so far $0.00.
-
-**--- Starting with Flash ---**
-
-This is a prescribed mechanical edit with clear checks; recorded cost so far $0.00.
+The same worker is implementing the agreed plan at max reasoning; recorded cost $0.12.
 
 **--- Escalation to the originating parent ---**
 
-The selected worker still fails the acceptance check after correction; recorded cost $0.12.
+Flash cannot complete the acceptance check after testing its remaining hypotheses;
+it returns the current diff, failed checks and blocker. Recorded cost $0.42.
 
-Harness faults are repaired and the same worker resumes. They do not trigger a
-switch to the other model. Workers never delegate to each other.
+Harness faults are repaired and the same worker resumes. Workers never delegate.
 
 ## Why it can save money
 
@@ -110,9 +107,9 @@ For a config stored outside the installed skill, set `OPENROUTER_PROVIDER_CONFIG
 
 Ask your coding agent:
 
-> Use triple-escalator to fix this issue. Define acceptance first and use Pro by default. Choose Flash only for clearly mechanical work. The selected worker returns to this chat for review and rescue; do not chain Flash to Pro. Preserve my edits and report checks and total available cost.
+> Use triple-escalator to fix this issue. Write a clear implementation plan covering component interactions and acceptance. Keep one persistent Flash worker at max reasoning to implement, self-review, test and repair it. It returns unfinished work only if it cannot finish. Preserve my edits and report checks and total available cost.
 
-The parent creates one session directory **outside the repository**, records its path, and resumes it for later tasks. Use `cascade_agent.py pro task.md --session /private/path/pr-session --task issue-123`. It restores the same native worker, which executes the work itself. The old patch runner is reserved for legacy diagnostics. Follow [session commands](references/sessions.md) for initialisation, feedback, handovers and compaction. Closing a session preserves its journal.
+The parent creates one session directory **outside the repository**, records its path, and resumes it for later tasks. Use `cascade_agent.py flash task.md --session /private/path/pr-session --task issue-123`. It restores the same native worker, which executes the work itself. The old patch runner is reserved for legacy diagnostics. Follow [session commands](references/sessions.md) for initialisation, feedback, handovers and compaction. Closing a session preserves its journal.
 
 Start with a small task and inspect the diff and results. Irreversible actions, payment or credential work, restricted data, and tasks without a reliable done-check stay in the calling chat, subject to your usual approvals.
 
@@ -129,11 +126,16 @@ Read the summary at PR completion or when requested. There are no model graders,
 The runner reads the selected endpoint's live output capacity and explicitly
 requests that allowance, reserving context space for the prompt. It adds no
 fixed application token cap. Reasoning counts towards that allowance.
-Flash currently selects `morph/fp8`; Pro selects `azure/us`. Both must be in your
-approved provider list. Use `--provider baseten/fp4` to select another approved
-Pro endpoint. Availability and limits are checked before each call. Flash and Pro
-both default to high reasoning; Flash can also be set to low or max. Use
-`--reasoning` to select another supported level.
+Flash selects the approved `morph/fp8` endpoint by default. The runner checks live
+availability and limits before calling it. Flash defaults to `reasoning.effort: "max"`
+in both the harness config and wire adapter. Do not silently downgrade it. Legacy
+Pro support remains for retained histories and explicitly requested diagnostics;
+it is not part of the active coding workflow.
+
+Omit `--budget` for normal coding work. Do not interrupt implementation or tests
+with arbitrary small dollar caps. Record costs and investigate genuine failure
+loops. An explicit user-set spending limit is still binding; paid application
+canary limits are separate from the worker's implementation loop.
 See [OpenRouter's reasoning-token documentation](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
 
 The adapter rejects truncated or empty replies. The worker may already have edited files before a later request fails, so inspect its actual diff and tool logs before resuming. Nothing silently rolls back valid work. A returned worker report is not acceptance; the parent checks the result against the agreed criteria.
