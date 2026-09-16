@@ -16,7 +16,7 @@ from cascade_apply import parse
 from cascade_tokens import input_tokens
 
 MODELS = {
-    "deepseek/deepseek-v4.1-flash": {"effort": "max", "efforts": {"low", "high", "max"}, "provider": "morph/fp8"},
+    "deepseek/deepseek-v4.1-flash": {"effort": "max", "efforts": {"low", "high", "max"}, "provider": "together"},
     "deepseek/deepseek-v4-pro": {"effort": "high", "efforts": {"high", "xhigh"}, "provider": "azure/us"},
 }
 

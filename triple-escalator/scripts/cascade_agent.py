@@ -56,6 +56,53 @@ def api_key():
     return key
 
 
+class Progress:
+    """Local status only: no prompt, tool input, output or extra model call."""
+    def __init__(self, path, bridge, run_id, pid, interval=30):
+        self.path, self.bridge, self.run_id, self.pid = path, bridge, run_id, pid
+        self.interval, self.started = interval, time.monotonic()
+        self.activity = "Starting worker"
+        self.stopped = threading.Event()
+        self.thread = threading.Thread(target=self.watch, daemon=True)
+
+    def emit(self, status):
+        state = {"run": self.run_id, "pid": self.pid, "worker": self.bridge.worker,
+                 "provider": self.bridge.tag, "status": status, "updated_at": time.time(),
+                 "elapsed_seconds": round(time.monotonic()-self.started),
+                 "api_calls": self.bridge.calls, "known_cost_usd": self.bridge.cost,
+                 "unknown_cost": self.bridge.unknown, "last_activity": self.activity}
+        try:
+            pending = self.path.with_suffix(".tmp")
+            pending.write_text(json.dumps(state, indent=2)+"\n")
+            pending.replace(self.path)
+        except OSError:
+            pass  # Display failure must not stop the worker or its cleanup.
+        extra = " + unknown billing" if state["unknown_cost"] else ""
+        try:
+            print(f"[{state['worker']} {status}] {state['provider']} | "
+                  f"{state['elapsed_seconds']}s | {state['api_calls']} calls | "
+                  f"US${state['known_cost_usd']:.4f}{extra} | {self.activity}",
+                  file=sys.stderr, flush=True)
+        except (OSError, ValueError):
+            pass  # The parent may close its progress pipe before the worker exits.
+
+    def start(self):
+        self.emit("running")
+        self.thread.start()
+
+    def watch(self):
+        while not self.stopped.wait(self.interval):
+            self.emit("running")
+
+    def stop(self, status):
+        if self.stopped.is_set():
+            return
+        self.stopped.set()
+        if self.thread.is_alive():
+            self.thread.join()
+        self.emit(status)
+
+
 class Bridge:
     """Inject routing at the wire boundary, including SDK-generated requests."""
     def __init__(self, session, worker, task, model, provider, tag, effort, key, catalogue, budget=None):
@@ -278,6 +325,7 @@ def run(args):
     command = ["/usr/bin/sandbox-exec", "-f", str(sandbox_file), executable, "run", "--pure", "--port", str(native_port), "--format", "json", "--model", "openrouter/"+model, "--agent", "build"]
     final, failures, native_id, proc = [], [], None, None
     watchdog = None
+    progress = None
     started = time.monotonic()
     repo_key = hashlib.sha256(str(Path(session.meta["repo"]).resolve()).encode()).hexdigest()
     ownership = ExitStack()
@@ -300,6 +348,8 @@ def run(args):
         with (run_dir/"stderr.log").open("w") as stderr, (run_dir/"events.jsonl").open("w") as output:
             proc = subprocess.Popen(command, cwd=session.meta["repo"], env=env, stdout=subprocess.PIPE,
                                     stderr=stderr, text=True, start_new_session=True)
+            progress = Progress(run_dir/"status.json", bridge, run_id, proc.pid)
+            progress.start()
             def expire():
                 failures.append("Worker wall-time limit reached; inspect evidence and resume the same session.")
                 terminate_group(proc)
@@ -325,6 +375,7 @@ def run(args):
                     failures.append(event.get("error"))
                 if kind == "tool_use":
                     state = part.get("state", {})
+                    progress.activity = f"{part.get('tool', 'tool')} {state.get('status', 'unknown')}"
                     session.append("worker_tool", worker=worker, task=args.task, run=run_id,
                                    tool=part.get("tool"), status=state.get("status"),
                                    input=state.get("input"), output=state.get("output"), metadata=state.get("metadata"))
@@ -336,6 +387,7 @@ def run(args):
                   "before": before, "after": revision(session.meta["repo"]), "logs": str(run_dir)}
         (run_dir/"report.json").write_text(json.dumps(report, indent=2)+"\n")
         session.append("coding_result", **report)
+        progress.stop(status)
         print(json.dumps(report, indent=2))
         return 0 if status == "returned" else 2
     finally:
@@ -343,6 +395,8 @@ def run(args):
             watchdog.cancel()
         if proc:
             terminate_group(proc)
+        if progress:
+            progress.stop("interrupted")
         if watchdog and watchdog.is_alive():
             watchdog.join()
         server.shutdown(); server.server_close(); thread.join()

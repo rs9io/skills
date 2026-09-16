@@ -10,7 +10,7 @@ import urllib.request
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'scripts'))
-from cascade_agent import Bridge, child_environment, configuration, terminate_group
+from cascade_agent import Bridge, child_environment, configuration, terminate_group, Progress
 from cascade_session import Session
 from cascade_sandbox import profile
 from http.server import ThreadingHTTPServer
@@ -117,6 +117,36 @@ class CodingAgentTests(unittest.TestCase):
         body = self.bridge.prepare({'model': MODEL, 'messages': [{'role': 'user', 'content': 'task'}], 'reasoning': {'effort': 'low'}})
         self.assertEqual(body['reasoning'], {'effort': 'max'})
         self.assertEqual(body['max_tokens'], 943718)
+
+    def test_progress_is_visible_and_records_terminal_state_without_source(self):
+        path = self.root/'status.json'
+        progress = Progress(path, self.bridge, 'run-test', 123, interval=60)
+        with patch('sys.stderr', io.StringIO()) as output:
+            progress.start()
+            self.assertEqual(json.loads(path.read_text())['status'], 'running')
+            self.bridge.cost = 0.025
+            self.bridge.unknown = True
+            progress.activity = 'bash completed'
+            progress.stop('returned')
+            progress.stop('interrupted')
+        state = json.loads(path.read_text())
+        self.assertEqual(state['status'], 'returned')
+        self.assertEqual(state['known_cost_usd'], 0.025)
+        self.assertTrue(state['unknown_cost'])
+        self.assertFalse(progress.thread.is_alive())
+        self.assertIn('[flash running]', output.getvalue())
+        self.assertIn('[flash returned]', output.getvalue())
+        self.assertIn('unknown billing', output.getvalue())
+        self.assertNotIn(self.bridge.key, path.read_text()+output.getvalue())
+
+    def test_progress_sink_failure_cannot_interrupt_worker_lifecycle(self):
+        progress = Progress(self.root/'status.json', self.bridge, 'test', 123)
+        with patch.object(Path, 'write_text', side_effect=OSError('disk unavailable')), patch('sys.stderr') as stderr:
+            stderr.write.side_effect = BrokenPipeError('display closed')
+            progress.start()
+            progress.stop('returned')
+        self.assertTrue(progress.stopped.is_set())
+        self.assertFalse(progress.thread.is_alive())
 
     def test_canary_budget_stops_between_calls_without_token_cap(self):
         self.bridge.budget=0.1;self.bridge.cost=0.1
