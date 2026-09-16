@@ -4,13 +4,13 @@ A skill for Codex, Claude Code and Cursor that keeps cheaper workers on the same
 
 **DeepSeek Flash on OpenRouter → DeepSeek Pro on OpenRouter → your current chat model.**
 
-Flash handles the implementation. If its result fails the agreed checks, Pro gets a turn. If both fail, the model already running your chat finishes the work directly. There is no separate frontier API call or fixed rescue-model name.
+Flash uses OpenCode to inspect the repository, edit files, run commands and tests, and repair failures inside its own tool loop. If its result fails the agreed checks, Pro gets a turn. If both fail, the model already running your chat finishes the work directly. There is no separate frontier API call or fixed rescue-model name.
 
 The original parent owns the plan and acceptance checks. One generalist Flash worker keeps its conversation through tasks, retries and corrections. Pro gets its own reusable conversation when needed. The parent reads the actual diff and failure evidence before each escalation, and passes accepted corrections back to Flash.
 
-The Python scripts save conversation journals and apply proposed edits. The agent still runs the checks and judges the result. Workers have no background process or idle API cost. Persistence means saved context, not model training.
+The parent writes the plan and judges the result. The Python adapter manages native worker sessions and enforces routing; OpenCode handles routine file and terminal work. The parent does not relay each command or apply worker patches. Workers have no background process or idle API cost. Persistence means saved context, not model training.
 
-Version 0.7.0 adds persistent sessions and passive measurements. A host-specific rescue override is allowed, such as choosing Fable for Cursor while Codex and Claude return to their original parent. Public installations inherit their original parent unless their user configures an override.
+Version 0.8.0 adds full coding workers. Version 0.7 retained conversations but still generated patches, leaving file handling and test execution with the parent. A host-specific rescue override is allowed, such as choosing Fable for Cursor while Codex and Claude return to their original parent. Public installations inherit their original parent unless their user configures an override.
 
 ## What you will see
 
@@ -33,7 +33,7 @@ Implementation and failed attempts move to cheaper external models. Your main mo
 
 ## Install
 
-Requires macOS or Linux, Python 3.10 or later, Git, a coding agent that supports SKILL.md, and your own funded OpenRouter account. No Python packages are required.
+Requires macOS, Python 3.10 or later, Git, npm, a coding agent that supports SKILL.md, and your own funded OpenRouter account. No Python packages are required. The coding harness is pinned to OpenCode 1.18.31; the macOS execution boundary must be available. Other operating systems currently fail closed.
 
 Download this repository. From its root, copy `triple-escalator` into your agent's skills directory. For Codex:
 
@@ -45,6 +45,12 @@ cp -R ./triple-escalator ~/.codex/skills/triple-escalator
 For Claude Code use `~/.claude/skills/triple-escalator`; for Cursor use `~/.cursor/skills/triple-escalator`. Keep independent copies where host policies differ.
 
 If that destination already exists, move your old copy aside first. Install in one discovery location only; a second link in `~/.agents/skills` can produce a duplicate skill entry. Reopen the agent's skill picker or start a new chat to refresh discovery.
+
+Install the tested coding harness:
+
+```sh
+npm install --prefix "$HOME/.local/share/triple-escalator/runtime" --save-exact opencode-ai@1.18.31
+```
 
 ### 1. Supply your own API key
 
@@ -91,7 +97,7 @@ Ask your coding agent:
 
 > Use triple-escalator to fix this issue. Define the done-check first, start with Flash, try Pro if Flash fails, and finish in this chat if both fail. Preserve my existing changes and report the checks and cost per rung.
 
-The parent creates one session directory **outside the repository**, records its path, and resumes it for later tasks. Application calls require `--session` and a stable `--task` ID; `--one-shot` is reserved for protocol diagnostics. Follow [session commands](references/sessions.md) for initialisation, feedback, handovers and compaction. Closing a session preserves its journal.
+The parent creates one session directory **outside the repository**, records its path, and resumes it for later tasks. Use `cascade_agent.py flash task.md --session /private/path/pr-session --task issue-123`. It restores the same native worker, which executes the work itself. The old patch runner is reserved for legacy diagnostics. Follow [session commands](references/sessions.md) for initialisation, feedback, handovers and compaction. Closing a session preserves its journal.
 
 Start with a small task and inspect the diff and results. Irreversible actions, payment or credential work, restricted data, and tasks without a reliable done-check stay in the calling chat, subject to your usual approvals.
 
@@ -110,13 +116,10 @@ Flash currently selects `morph/fp8`; Pro selects `azure/us`. Both must be in you
 approved provider list. Use `--provider baseten/fp4` to select another approved
 Pro endpoint. Availability and limits are checked before each call. Flash and Pro
 both default to high reasoning; Flash can also be set to low or max. Use
-`--reasoning-effort` to select another supported level.
+`--reasoning` to select another supported level.
 See [OpenRouter's reasoning-token documentation](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
 
-A truncated or empty response fails with a nonzero exit code. It never becomes
-the usable reply file. A metadata sidecar records the finish reason, token usage
-and cost; partial text stays in a separate file. A completed response still needs
-to pass exact-match edit validation and the task's checks.
+The adapter rejects truncated or empty replies. The worker may already have edited files before a later request fails, so inspect its actual diff and tool logs before resuming. Nothing silently rolls back valid work. A returned worker report is not acceptance; the parent checks the result against the agreed criteria.
 
 ## Data sovereignty
 
@@ -124,7 +127,7 @@ A provider allowlist is a routing control. A company's country of ownership does
 
 OpenRouter documents separate [provider-routing controls](https://openrouter.ai/docs/guides/routing/provider-selection) and [zero-data-retention policies](https://openrouter.ai/docs/guides/features/zdr). ZDR does not mean the data stays on your machine, and OpenRouter permits some in-memory caching within its definition. Review OpenRouter's own privacy settings as well as the downstream provider's terms.
 
-Keep credentials, customer records, proprietary pricing and other restricted material out of delegated prompts unless the chosen service and workflow are approved for it. The runner sends the current prompt and restored worker context, including the parent brief and shared corrections; it is not a sensitive-data scanner. The calling chat is also a hosted service with its own policies.
+Keep credentials, customer records, proprietary pricing and other restricted material out of delegated prompts unless the chosen service and workflow are approved for it. The runner sends the worker conversation, including source and command output the worker reads inside its allowed checkout; it is not a sensitive-data scanner. The calling chat is also a hosted service with its own policies.
 
 ## Verify the package locally
 
@@ -132,6 +135,10 @@ Keep credentials, customer records, proprietary pricing and other restricted mat
 python3 -m unittest discover -s triple-escalator/tests -v
 ```
 
-The tests use local fixtures and mocked HTTP calls. They do not spend API credit. The strict edit helper operates on existing files and checks all edit blocks before writing. Keep a snapshot: an interrupted disk write can still leave partial changes.
+The tests use local fixtures, mocked HTTP calls and a real local sandbox check. They do not spend API credit. The native harness preserves its conversation and tool history; the parent journal links each result and records actual API usage. Worker tool output and parent acceptance remain distinct.
+
+The OS boundary permits checkout/runtime writes and approved read-only tools and dependencies. It blocks general outbound network, access to unrelated home files, common credential filenames and signalling unrelated processes. The child gets no inherited API/cloud secrets. Repository contents and explicitly allowed dependencies must still be suitable for the approved provider; the boundary is not a secret scanner. Local Git commits are in scope when the parent asks for them; changes to Git hooks/config are blocked.
+
+A live disposable-repo trial verified Flash reading a broken program, running the failing baseline, editing it and passing tests; a follow-up resumed the same worker. Pro independently read, edited and ran tests through its own persistent session. These checks establish the execution path, not a cost or quality advantage on every production task.
 
 The public bundle uses user-configured providers and environment-based credentials. It contains no private account configuration.

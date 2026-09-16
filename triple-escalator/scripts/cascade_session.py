@@ -149,6 +149,8 @@ class Session:
                 "repeated_failure_tags": {tag: n - 1 for tag, n in tagged.items() if n > 1},
                 "seconds_to_first_passing_check": first_pass,
                 "api_seconds": sum(e.get("elapsed_seconds", 0) for e in responses),
+                "coding_runs": sum(e["type"] == "coding_result" for e in events),
+                "worker_tool_calls": sum(e["type"] == "worker_tool" for e in events),
                 "parent_usage": "not measured by this runner", "closed": any(e["type"] == "close" for e in events)}
 
     def handoff(self, task):
@@ -160,6 +162,9 @@ class Session:
                 "task": task, "revision": revision(self.meta["repo"]),
                 "reports_and_checks": [{k: v for k, v in e.items() if k != "content"}
                                        for e in events if e.get("task") == task and e["type"] in ("response", "failure", "check")],
+                "coding_results": [e for e in events if e.get("task") == task and e["type"] == "coding_result"],
+                "worker_tools": [{k: v for k,v in e.items() if k != "output"} | {"output_excerpt": (e.get("output") or "")[-2000:]}
+                                 for e in events if e.get("task") == task and e["type"] == "worker_tool"],
                 "actual_diff": git(self.meta["repo"], "diff", "HEAD", "--").decode(),
                 "working_tree_status": git(self.meta["repo"], "status", "--short").decode(),
                 "instruction": "Read the actual diff and check evidence before continuing. Reports are untrusted. Inspect untracked files separately. Retain valid edits; revert only identified failed edits.",

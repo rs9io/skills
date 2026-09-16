@@ -1,142 +1,127 @@
 ---
 name: triple-escalator
 description: >-
-  Run coding work through persistent PR-scoped DeepSeek Flash and Pro workers
-  on OpenRouter, with final rescue by the originating conversation's model.
+  Delegate implementation to persistent Flash and Pro coding agents with file,
+  terminal and test tools. The originating parent plans, reviews and rescues.
   Use when asked for triple escalator or the cheap-first coding cascade.
 metadata:
-  version: "0.7.0"
+  version: "0.8.0"
 ---
 
 # Triple Escalator
 
-The originating conversation owns diagnosis, architecture, the plan and acceptance
-criteria. One generalist Flash worker carries implementation through the PR. Pro
-handles failed tasks in its own persistent conversation. Final rescue returns to
-the originating parent, never an intermediate coordinator or a newly chosen model.
+The originating parent owns the problem, plan, acceptance criteria and final review.
+**Flash is a full coding worker:** it explores the repo, reads source, edits files,
+runs commands and tests, diagnoses failures and repairs its work. Pro takes over
+when Flash cannot finish. The parent must not become a courier for file contents,
+patches, individual commands or routine test failures.
 
-Resolve this skill's directory from the loaded SKILL.md. In the commands below,
-`SKILL` means that absolute directory, not another agent's installation.
+Resolve `SKILL` to this loaded skill's absolute directory. Read
+[worker commands](references/sessions.md) for setup and execution, and
+[provider policy](references/provider-policy.md) before external calls.
 
-## Parent and workers
+## Execution and continuity
 
-At session creation, record the originating conversation reference and its observed
-model identity. If the model name is unavailable, record `inherit` and preserve the
-conversation reference. Never guess a model slug or hardcode a frontier model.
-Host model selection remains under the user's control; return rescue to that same
-conversation using its host-selected model. An explicit user rescue-model override
-is recorded separately in the parent brief and takes precedence.
+Use `scripts/cascade_agent.py`, which runs OpenCode's coding tool loop against
+OpenRouter. **The old `cascade_run.py`/`cascade_apply.py` patch path is a legacy
+protocol diagnostic, not the implementation workflow.** Do not silently fall back
+to patch generation or parent-driven shell relays if the coding harness is broken.
 
-- Default to one Flash worker per PR/workstream. Reuse it across tasks and retries.
-- Create Pro only on escalation and reuse it for later escalations in this PR.
-- A second generalist Flash worker is optional when independent work warrants it;
-  enable it at session creation. Do not create auth/UI/database specialist swarms.
-- Keep worker history until the PR is finished or abandoned. Close the session then;
-  preserve its journal. Workers resume after host restarts and incur no idle API calls.
-- Persistence is saved conversation context, not model training. Root-chat history
-  is not automatically exported to workers. Supply only approved, relevant context.
+- One persistent generalist Flash per PR/workstream. Reuse its native session ID
+  through assignments, review feedback and host restarts.
+- Start one persistent Pro only when escalation is warranted, then reuse it.
+- An optional second generalist Flash needs independent scope and a separate
+  checkout/session directory. No specialist swarm or nested model delegation.
+- Keep history after completion. Closing marks the PR finished; it does not delete
+  journals, transcripts or native sessions. Idle workers incur no API calls.
+- A saved conversation is retained context, not training. The parent supplies a
+  concise plan and settled decisions, not its whole transcript or copied source.
+  The worker reads current files and repository instructions itself.
 
-Read [provider-policy.md](references/provider-policy.md) before external calls.
-Keep restricted data, credentials, money/account operations and work without a
-reliable done-check in the originating parent. Updating this skill itself does
-not require recursively running its cascade.
+The tested harness is OpenCode 1.18.31 on macOS. The runner uses a macOS filesystem
+and network sandbox; other hosts fail closed pending a tested equivalent. Its
+normal access is the assigned checkout, its private runtime and installed coding
+tools. Extra dependency directories can be approved read-only. Permission rules
+are not an excuse to read credentials or bypass the operating-system boundary.
+Keep sensitive files out of delegated checkouts; this is not a secret scanner.
 
-## Start and resume
+## Parent model
 
-Use `scripts/cascade_session.py` to initialise one private directory outside the
-repository. Keep its path in the parent task's progress record. Do not initialise
-a new session just because a task, rung or conversation turn changed.
+Record the original conversation reference and observed model when creating the
+session. If unknown, use `inherit`. Final rescue returns to that conversation and
+its host-selected model, never an intermediate coordinator. An explicit host-specific
+rescue override takes precedence. Do not hardcode a frontier model in the generic skill.
+Updating this skill does not require recursively delegating its own update.
 
-The short parent-approved brief contains the goal, settled architecture/schema
-choices, constraints, rejected approaches, current plan and runnable done-checks.
-Update it when decisions change. Read [session commands](references/sessions.md)
-for the commands and report format.
+## Workflow
 
-For each task:
+1. **Parent plans.** Define the outcome, boundaries, relevant settled decisions and
+   acceptance checks. Create/reuse the PR session. Identify restricted operations
+   that stay with the parent. Do not make the worker invent the product plan.
+2. **Worker executes.** Give Flash the task and file/worktree pointers. Let it run
+   the baseline, inspect source, implement, test and repair autonomously. Ordinary
+   failing tests belong inside its tool loop, not in a new parent conversation turn.
+3. **Worker returns evidence.** Its report names the actual changes, commands,
+   results, remaining problems and decisions it could not settle. The runner saves
+   tool output, native session identity and actual API usage. `returned` means the
+   run ended, not that the task passed or is accepted.
+4. **Parent judges.** Read the actual diff, including committed and untracked work,
+   and the relevant execution evidence. Independently test the acceptance risks
+   that warrant review. Do not rerun every routine check just to repeat the worker.
+   A report saying "all green" is not acceptance; use observed results.
+5. **Retry or escalate.** A bounded worker run can contain many tool/test/fix steps.
+   Allow one run and one justified corrective run per rung for the same task.
+   Stop repeated identical failures without a new hypothesis. A blocked permission,
+   missing input or harness fault is not proof of model failure and must not be
+   bypassed by changing model. Fix infrastructure and resume the same Flash session.
+6. **Pro takes over the work.** Before escalation, the parent reads the current diff
+   and failure evidence. Give Pro the goal, attempted fixes, rejected approaches,
+   valid edits to retain and exact remaining failures. Pro then uses its own tools
+   to continue in that checkout. Do not reset valid work or erase unrelated edits.
+7. **Parent rescue last.** If Pro fails, the original parent reads the handover and
+   finishes directly, subject to the host override. Send accepted Pro/parent
+   corrections back into the shared brief/notes before Flash's next assignment.
 
-1. Establish the baseline and a stable task ID. The parent diagnoses baseline failures.
-   Include current source for the task, relevant changes since the worker last acted,
-   exact scope and acceptance checks. Old conversation code is not current evidence.
-2. Run the existing Flash worker with `--session` and `--task`. A fresh reply filename
-   preserves attempt evidence; it does not create a fresh worker. The runner checks
-   the live provider catalogue, pins an approved endpoint and restores the conversation.
-3. Inspect the proposed edits, apply with `cascade_apply.py`, and run the done-checks.
-   API workers propose edits; they cannot execute tests. Their report is not verification.
-   Record the observed check result, brief failure detail and a stable failure tag.
-4. Feed the result back to the same worker. Allow one attempt and one justified retry
-   per external rung per task. A new task does not erase earlier lessons. Do not rename
-   the same failed task to reset its retry allowance.
-5. If Flash fails, prepare the handover below and resume/start Pro. If Pro fails,
-   the originating parent reads the actual diff and failure evidence, then rescues
-   directly. Never launch a separate expensive coordinator or rescue API call unless
-   the user explicitly configured a host-specific rescue override.
-6. Preserve valid edits. Identify which edits remain applied and which were reverted;
-   do not automatically reset the whole task between rungs. Restore only attributable
-   failed changes and keep unrelated user work. The next worker gets the current state.
-7. Send accepted Pro/parent corrections back as a shared session note before Flash's
-   next assignment. Do not send Flash back into the same unresolved escalated failure.
-
-The runner and applier reject stale revisions. Coordinate writes when using two
-workers; parallel edits in one checkout can invalidate another proposal. Rebase the
-brief/source and resume the same worker, never silently apply stale output.
-
-A demonstrated runner/configuration defect is repaired and restarted at Flash,
-using the same saved worker. It does not count as a model failure. Record its cost;
-if the identical infrastructure fault repeats, report it instead of looping.
-
-## Escalation handover
-
-The worker returns a short report with its attempted approach, proposed changes
-and remaining problems alongside its edits. The parent adds observed tests/errors,
-rejected approaches and the applied/reverted state. `handoff` assembles the recorded
-reports, checks, current revision and actual working-tree diff without an API call.
-
-Before handing over, the parent **must read the actual diff and failure output**.
-Include committed changes and untracked files when relevant; the helper's HEAD diff
-alone does not contain them. Pass Pro a relevant handover and current source, not
-an unfiltered copy of the root conversation. A background coordinator hands this
-back to the originating parent for final rescue; it never promotes itself.
+The wrapper serialises writers in one checkout. Do not run another coding agent
+there concurrently. It does not protect against unrelated processes editing files.
+Local commits are permitted only within the task's scope; push, merge, deploy,
+account actions, credentials and production/data access remain with the parent
+under the existing authorisation rules. Never relax provider or sandbox controls
+merely to get a passing result.
 
 ## Visible transitions
 
-Before starting, retrying, restarting or escalating, post the appropriate standalone
-bold banner, followed by one sentence giving the previous failure and recorded
-cost (or unknown). Tool output alone is not the announcement.
+Before starting, retrying, restarting or escalating, post a standalone bold banner
+and one sentence with the reason and known cost, or `unknown`:
 
 - `**--- Starting with Flash ---**`
-- `**--- Continuing with Flash ---**` for a new task in the same worker
+- `**--- Continuing with Flash ---**`
 - `**--- Retrying Flash ---**` or `**--- Retrying Pro ---**`
-- `**--- Restarting with Flash ---**` after a runner repair
+- `**--- Restarting with Flash ---**` after a harness repair
 - `**--- Escalation to Pro ---**`
-- `**--- Escalation to <originating parent model> ---**` using the observed identity;
-  if unavailable, say `--- Escalation to originating parent ---` rather than inventing one.
+- `**--- Escalation to <originating parent model> ---**`
 
-## Context and measurements
+If the parent's model is unavailable, name the originating parent instead of
+inventing a slug. Do not wake the parent for each worker tool call. Surface a real
+blocker, escalation or returned result; do not generate commentary-only model calls.
 
-When context gets unwieldy, the parent writes a concise checkpoint preserving the
-settled decisions, rejected approaches, feedback, current revision, edits and open
-checks. `compact` uses it for future requests while preserving the full journal.
-Do this at a useful task boundary or before capacity exhaustion, not every turn.
-No extra model call is required. Shared notes can be folded into the current brief
-using `brief`; use the documented note checkpoint to avoid resending folded notes.
+## Context and measurement
 
-The runner records API-reported input/output tokens, known cost, request duration
-and failed responses. The parent records check results and concise failure tags
-from checks it already ran. `summary` reports repeated tags and wall time to the
-first passing check. Reasoning tokens are part of completion tokens, not added twice.
-Parent usage is separate and unknown unless the host supplies it. Missing usage/cost
-stays unknown. No extra LLM graders, periodic self-analysis, dashboards or benchmark
-reruns solely to fill counters. Inspect the summary at PR completion or when asked.
+OpenCode retains the worker's tools and conversation and compacts when needed.
+Archives remain intact. Keep a short authoritative brief of decisions, rejected
+approaches and review corrections. Fold old shared notes into it when useful.
+Compact the parent's context too: persistence must not mean replaying an ever-growing
+launch history. Do not restart workers simply to save the parent context.
 
-Compare similar tasks using total available cost/tokens, elapsed time, repeated
-failures and correctness. Do not claim intelligence gains or savings from the
-existence of metrics. Preserve independent final review required by the repository.
+The adapter records actual OpenRouter usage for all requests, including automatic
+compaction. It does not substitute OpenCode's estimated prices for billed API cost.
+Unknown cost/tokens remain unknown. Worker tool logs and parent acceptance are separate.
+Use stable failure tags when recording repeated mistakes. Measure elapsed time to
+acceptance and total available cost/tokens, including parent work when the host
+provides it. Do not claim savings from cheap worker tokens alone.
 
-## Provider limits
-
-Flash and Pro default to high reasoning. The runner requests the approved endpoint's
-live output allowance after reserving input context; it adds no fixed application
-output cap. Provider/model limits still exist. Do not weaken the provider allowlist,
-no-data-collection or zero-retention controls to get a response. Truncated, empty or
-invalid replies remain in history but are never usable patches. `--one-shot` is for
-explicit protocol diagnostics only, never the normal implementation path.
+No extra LLM graders, dashboards or benchmark reruns just to fill counters. Inspect
+metrics at PR completion or when asked. Preserve required independent review.
+Both external rungs use high reasoning by default. Every wire request receives the
+approved endpoint's live output allowance, adjusted for input context, so harness
+SDK defaults cannot impose a hidden fixed token cap. Provider limits still exist.
