@@ -34,14 +34,14 @@ class Sessions(unittest.TestCase):
         subprocess.run(["git", "-C", str(self.repo), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-qm", "fixture"], check=True)
         self.session = Session.create(self.root / "session", self.repo, "original-chat-123", "inherit", "Use schema two. Parent owns the plan.")
         self.providers = self.root / "providers.json"
-        self.providers.write_text('{"only":["morph","azure"],"ignore":["deepseek"]}')
+        self.providers.write_text('{"only":["together","azure"],"ignore":["deepseek"]}')
         self.counter = 0
 
     def run_worker(self, model=FLASH, task="schema", content=None, finish="stop", usage=None, mutate=None, worker=None):
         self.counter += 1
         prompt, reply = self.root / f"prompt{self.counter}", self.root / f"reply{self.counter}"
         prompt.write_text("Continue the agreed task against the supplied current source.")
-        tag = "morph/fp8" if model == FLASH else "azure/us"
+        tag = "together" if model == FLASH else "azure/us"
         endpoint = {"tag": tag, "max_completion_tokens": 384000, "context_length": 1048576, "supported_parameters": ["max_tokens"]}
         body = {"provider": tag, "choices": [{"finish_reason": finish, "message": {"content": content if content is not None else answer()}}], "usage": usage}
         payloads = []

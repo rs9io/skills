@@ -15,7 +15,7 @@ unfinished work only when it cannot finish or needs a decision/access outside it
 scope. The parent reviews the result, handles release boundaries and rescues real
 failures. Pro is outside the active route. Reuse the same Flash session for feedback
 and later assignments; saved context is not training. Idle sessions make no calls.
-Version 1.0 preserves existing installation paths and all worker histories.
+Version 1.1 preserves existing installation paths and all worker histories.
 
 Codex and Claude return to their originating conversation and host-selected model.
 A configured host rescue override remains valid, such as Fable in Cursor. No extra
@@ -126,7 +126,7 @@ Read the summary at PR completion or when requested. There are no model graders,
 The runner reads the selected endpoint's live output capacity and explicitly
 requests that allowance, reserving context space for the prompt. It adds no
 fixed application token cap. Reasoning counts towards that allowance.
-Flash selects the approved `morph/fp8` endpoint by default. The runner checks live
+Flash selects the approved `together` endpoint by default. The runner checks live
 availability and limits before calling it. Flash defaults to `reasoning.effort: "max"`
 in both the harness config and wire adapter. Do not silently downgrade it. Legacy
 Pro support remains for retained histories and explicitly requested diagnostics;
@@ -139,6 +139,19 @@ canary limits are separate from the worker's implementation loop.
 See [OpenRouter's reasoning-token documentation](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
 
 The adapter rejects truncated or empty replies. The worker may already have edited files before a later request fails, so inspect its actual diff and tool logs before resuming. Nothing silently rolls back valid work. A returned worker report is not acceptance; the parent checks the result against the agreed criteria.
+
+## Visible progress
+
+The runner prints a short status line immediately and every 30 seconds, so a
+background task no longer stays blank until it finishes. Status includes the
+provider, elapsed time, requests, known cost and last tool type. It does not expose
+source or credentials, and its JSON completion report remains on stdout.
+
+In Codex, the parent uses a native supervisor to show the existing Flash worker in
+the agent list and receive its completion. The supervisor only manages that process;
+Flash still does the coding in its existing session. If the parent needs to end its
+turn, it sets a host heartbeat for completion or failure and pauses it afterwards.
+Other hosts use their own supported background-task notification or stay attached.
 
 ## Data sovereignty
 

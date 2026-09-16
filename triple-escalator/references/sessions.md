@@ -1,6 +1,6 @@
 # Coding workers: setup and commands
 
-Version 1.0 uses one persistent Flash coding worker at max reasoning. The parent
+Version 1.1 uses one persistent Flash coding worker at max reasoning. The parent
 writes a plan that covers component interactions and acceptance. Flash implements,
 self-reviews, tests and repairs the work before returning a completion report.
 Unfinished work returns only for a concrete blocker or inability to finish.
@@ -54,7 +54,7 @@ python3 "$SKILL/scripts/cascade_agent.py" flash /private/path/task.md \
 
 The task contains the goal, relevant pointers, scope and checks. Do not paste every
 source file or instruct the parent to apply the worker's edits. Workers read current
-source, discover repository instructions, edit and test themselves. The runner
+source, discover repository instructions, edit and test themselves. The runner emits status on stderr immediately and every 30 seconds, and
 prints a report with the persistent native session ID, log path, before/after
 revision and actual API cost. Native transcripts live under `session/coding/data`;
 per-run command/tool events and reports live under `session/coding/<run-id>`.
@@ -143,3 +143,20 @@ parent; don't end the parent task while it is still running without a resume pat
 
 `cascade_run.py` and `cascade_apply.py` remain for old evidence and explicit protocol
 diagnostics. They are not full coding agents. Do not use them for application work.
+
+## Codex supervisor
+
+Use the host native agent tool for a bounded lifecycle task while the parent does
+independent work. Give the supervisor the exact existing session, task file,
+provider and run command. It may launch the runner once, or attach to the known
+process, then wait for its report and return that report. It does not implement,
+review or fork the Flash conversation. Persist the supervisor ID and exec/run IDs
+in the resume note. On every resume inspect the actual process and report first.
+Use `status.json` for display only; verify a stale running status against its PID
+and exact command, and distinguish completion from unexpected process death.
+
+If returning to the user before completion, use the supported thread heartbeat
+so this same parent resumes without a user message. Inspect existing automations
+before creating one, avoid duplicates, stay quiet while unchanged, and pause the
+heartbeat when its completion has been handled. A native child return alone must
+not be described as a guaranteed wake-up after the parent turn has ended.

@@ -5,7 +5,7 @@ description: >-
   tests a clear parent-authored plan. Real failures return directly to the original
   parent. Use for triple escalator or double escalation.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Triple Escalator
@@ -117,6 +117,33 @@ If the parent's model is unavailable, name the originating parent instead of
 inventing a slug. Do not wake the parent for each worker tool call. Surface a real
 blocker, escalation or returned result; do not generate commentary-only model calls.
 
+## Visible supervision and completion
+
+An external OpenCode process does not automatically appear as a native host agent.
+A saved resume path alone does not wake the parent. Do not leave the user to poll.
+
+For Codex, use one named native supervisor for the existing Flash process when
+native agents are available. This is a lifecycle wrapper, not a second coding
+worker: it starts or attaches to the same persistent Flash session, watches local
+process/report evidence, and returns the result to the parent. It must not edit
+application code, plan, review, call another model, or create another Flash session.
+The parent does useful independent work while it runs. Use shell waits for
+monitoring, not repeated reasoning calls. The native task provides a visible
+running/completed entry in the host's agent list.
+
+Keep the parent active until the completion arrives. If the turn must end while
+work continues, first register a supported host heartbeat to resume this original
+conversation on completion, failure or required input. Keep it quiet on unchanged
+state, record the exact session/run and next step, and pause it once handled. Never
+claim a background process alone will wake the parent. Other hosts should use their
+supported background-task completion notification; if unavailable, stay attached.
+
+The runner emits a metadata-only status line on stderr at start, every 30 seconds,
+and at exit. Each run also has `status.json` with provider, elapsed time, call count,
+known cost and last completed tool type. `report.json` is the completion evidence;
+a stale running status is not proof of a live process. Do not log prompt or tool
+contents to the status display or label local completion as parent acceptance.
+
 ## Context and measurement
 
 OpenCode retains the worker's tools and conversation and compacts when needed.
@@ -136,7 +163,7 @@ Do not impose arbitrary dollar cutoffs on coding workers. Track actual spend and
 
 No extra LLM graders, dashboards or benchmark reruns just to fill counters. Inspect
 metrics at PR completion or when asked. Preserve required independent review.
-Flash uses `reasoning.effort: "max"` by default, including SDK helper calls. Verify
+Flash defaults to the approved `together` endpoint and uses `reasoning.effort: "max"`, including SDK helper calls. Verify
 the live model supports max; do not silently downgrade it. Every wire request receives the
 approved endpoint's live output allowance, adjusted for input context, so harness
 SDK defaults cannot impose a hidden fixed token cap. Provider limits still exist.
