@@ -20,6 +20,7 @@ import uuid
 from cascade_run import ENDPOINT, MODELS, output_route, provider_config
 from cascade_session import Session, lock, revision
 from cascade_sandbox import profile
+from provider_health import record as record_provider_health
 
 VERSION = "1.18.31"
 RUNTIME = Path.home() / ".local/share/triple-escalator/runtime/node_modules/.bin/opencode"
@@ -72,13 +73,17 @@ class Bridge:
         body["stream_options"] = {"include_usage": True}
         return body
 
-    def record_usage(self, attempt, usage, started, status):
+    def record_usage(self, attempt, usage, started, status, error=None):
         known = isinstance((usage or {}).get("cost"), (int, float))
         self.cost += usage["cost"] if known else 0
         self.unknown |= not known
         self.session.append("response", attempt=attempt, worker=self.worker, task=self.task,
                             usage=usage, status=status, elapsed_seconds=time.monotonic()-started,
                             content=None, report=None)
+        try:
+            record_provider_health(attempt, self.tag, self.model, status, time.monotonic()-started, usage, error)
+        except OSError as exc:
+            print(f"Provider reliability log unavailable: {type(exc).__name__}", file=sys.stderr)
 
     def handler(self):
         bridge = self
@@ -92,6 +97,7 @@ class Bridge:
                     return
                 with bridge.mutex:
                     attempt, started, usage, sent, status = str(uuid.uuid4()), time.monotonic(), None, False, "failed"
+                    detail = None
                     try:
                         body = bridge.prepare(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
                         bridge.session.append("request", attempt=attempt, worker=bridge.worker, task=bridge.task,
@@ -161,7 +167,7 @@ class Bridge:
                             self.send_error(400, detail)
                     finally:
                         if sent:
-                            bridge.record_usage(attempt, usage, started, status)
+                            bridge.record_usage(attempt, usage, started, status, detail)
                         self.close_connection = True
         return Handler
 

@@ -5,7 +5,7 @@ description: >-
   terminal and test tools. The originating parent plans, reviews and rescues.
   Use when asked for triple escalator or the cheap-first coding cascade.
 metadata:
-  version: "0.8.0"
+  version: "0.8.1"
 ---
 
 # Triple Escalator
@@ -125,3 +125,19 @@ metrics at PR completion or when asked. Preserve required independent review.
 Both external rungs use high reasoning by default. Every wire request receives the
 approved endpoint's live output allowance, adjusted for input context, so harness
 SDK defaults cannot impose a hidden fixed token cap. Provider limits still exist.
+
+## Provider reliability and pending decisions
+
+Each upstream request also appends passive counters to
+`~/.local/share/triple-escalator/provider-reliability/requests.csv`.
+Run `python3 "$SKILL/scripts/provider_health.py"` for request success, rate-limit
+counts, latency and known costs by endpoint. Unknown billing stays unknown. The log
+contains no prompts, source, response bodies or credentials and makes no extra API
+calls. `--import-session PATH` imports an existing journal without inflating reports
+when repeated. API reliability is separate from code quality and task acceptance.
+For repeated provider failures, try another already approved compatible endpoint
+with the same model and native session before treating this as a model failure.
+
+When a user decision is outstanding, announce **Your input is needed** separately
+from routine progress. State the blocked action and continue only independent work.
+Include unresolved decisions in the final status. Silence is never approval.
