@@ -19,6 +19,8 @@ def load(name):
 
 applier = load('cascade_apply')
 sys.modules['cascade_apply'] = applier
+session_module = load('cascade_session')
+sys.modules['cascade_session'] = session_module
 runner = load('cascade_run')
 
 
@@ -53,12 +55,12 @@ class Helpers(unittest.TestCase):
             prompt, reply, providers = root / "prompt", root / "reply", root / "providers.json"
             prompt.write_text("Fix the fixture.")
             providers.write_text('{"only":["morph"]}')
-            with patch.dict("os.environ", {"OPENROUTER_API_KEY": "fixture-key", "OPENROUTER_PROVIDER_CONFIG": str(providers)}), patch("sys.argv", ["runner", "deepseek/deepseek-v4.1-flash", str(prompt), str(reply), *extra]), patch("urllib.request.urlopen") as api, patch("sys.stdout", io.StringIO()), patch("sys.stderr", io.StringIO()):
+            with patch.dict("os.environ", {"OPENROUTER_API_KEY": "fixture-key", "OPENROUTER_PROVIDER_CONFIG": str(providers)}), patch("sys.argv", ["runner", "deepseek/deepseek-v4.1-flash", str(prompt), str(reply), "--one-shot", *extra]), patch("urllib.request.urlopen") as api, patch("sys.stdout", io.StringIO()), patch("sys.stderr", io.StringIO()):
                 endpoint = {"tag":"morph/fp8","max_completion_tokens":943718,"context_length":1048576,"supported_parameters":["max_tokens"]}
                 api.side_effect = lambda request, **kwargs: io.StringIO(json.dumps({"data":{"endpoints":[endpoint]}} if isinstance(request,str) else body))
                 result = runner.main()
                 payload = json.loads(api.call_args.args[0].data)
-            return result, payload, {p.name: p.read_text() for p in root.iterdir()}
+            return result, payload, {p.name: p.read_text() for p in root.iterdir() if p.is_file()}
 
     def test_complete_reply_uses_live_capacity_without_fixed_cap(self):
         result, payload, files = self.invoke_runner(usage={"completion_tokens_details": None})

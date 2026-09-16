@@ -9,6 +9,7 @@ Usage: cascade_apply.py <repo-root> <reply-file>
 Exit: 0 all edits applied, 1 any failed.
 """
 import re
+import json
 import sys
 from pathlib import Path
 
@@ -87,7 +88,15 @@ def main():
     if len(sys.argv) != 3:
         sys.exit("Usage: cascade_apply.py <repo-root> <reply-file>")
     try:
-        apply(Path(sys.argv[1]), Path(sys.argv[2]).read_text())
+        root, reply = Path(sys.argv[1]).resolve(), Path(sys.argv[2])
+        meta_path = Path(str(reply) + ".meta.json")
+        if meta_path.exists():
+            metadata = json.loads(meta_path.read_text())
+            if metadata.get("session_id"):
+                from cascade_session import revision
+                if str(root) != metadata["repo"] or revision(root) != metadata["base_revision"]:
+                    raise ValueError("Stale proposal: current tree differs from the worker's base. Resume the same worker with the new diff.")
+        apply(root, reply.read_text())
     except (OSError, ValueError) as error:
         sys.exit(str(error))
 

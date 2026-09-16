@@ -1,182 +1,142 @@
 ---
 name: triple-escalator
 description: >-
-  Runs a cheap-first coding cascade: DeepSeek Flash on OpenRouter,
-  then DeepSeek Pro on OpenRouter if Flash fails, then direct rescue by
-  the model in the calling chat if both fail. Use when the user says
-  "triple escalator", "use the cascade on X", or asks for delegated coding
-  work through this cascade. No manual prompt courier or separate final-model API call.
+  Run coding work through persistent PR-scoped DeepSeek Flash and Pro workers
+  on OpenRouter, with final rescue by the originating conversation's model.
+  Use when asked for triple escalator or the cheap-first coding cascade.
+metadata:
+  version: "0.7.0"
 ---
 
-# Triple Escalator for Codex
+# Triple Escalator
 
-The calling chat owns the diagnosis, plan, task boundaries and acceptance
-criteria. Flash does the grunt work: bounded implementation tasks from that
-plan. Pro handles failed implementation tasks, and the calling chat's current
-model performs the final rescue directly. Never hardcode a frontier model.
+The originating conversation owns diagnosis, architecture, the plan and acceptance
+criteria. One generalist Flash worker carries implementation through the PR. Pro
+handles failed tasks in its own persistent conversation. Final rescue returns to
+the originating parent, never an intermediate coordinator or a newly chosen model.
 
-Read [provider-policy.md](references/provider-policy.md) before sending any
-prompt externally. The runner requires the user's own explicit provider allowlist and applies
-blocked-provider, no-data-collection and zero-retention routing controls.
-Install and configure it using the repository README before running a rung.
+Resolve this skill's directory from the loaded SKILL.md. In the commands below,
+`SKILL` means that absolute directory, not another agent's installation.
 
-## Rungs
+## Parent and workers
 
-| Rung | Model | Execution |
-|---|---|---|
-| 1 | DeepSeek V4.1 Flash | OpenRouter: `deepseek/deepseek-v4.1-flash` |
-| 2 | DeepSeek V4 Pro | OpenRouter: `deepseek/deepseek-v4-pro`, after Flash fails |
-| 3 | Current model in the calling chat | Direct work in that chat, after both external rungs fail |
+At session creation, record the originating conversation reference and its observed
+model identity. If the model name is unavailable, record `inherit` and preserve the
+conversation reference. Never guess a model slug or hardcode a frontier model.
+Host model selection remains under the user's control; return rescue to that same
+conversation using its host-selected model. An explicit user rescue-model override
+is recorded separately in the parent brief and takes precedence.
 
-Start with Flash for both small and multi-file tasks. Do not skip to Pro just
-because a task is large. Check the live OpenRouter catalogue before running;
-if a configured model is unavailable, record that rung as unavailable and move
-on. Do not invent a replacement slug or weaken provider restrictions.
+- Default to one Flash worker per PR/workstream. Reuse it across tasks and retries.
+- Create Pro only on escalation and reuse it for later escalations in this PR.
+- A second generalist Flash worker is optional when independent work warrants it;
+  enable it at session creation. Do not create auth/UI/database specialist swarms.
+- Keep worker history until the PR is finished or abandoned. Close the session then;
+  preserve its journal. Workers resume after host restarts and incur no idle API calls.
+- Persistence is saved conversation context, not model training. Root-chat history
+  is not automatically exported to workers. Supply only approved, relevant context.
 
-One attempt per external rung. One prompt-fixed retry is allowed on that rung
-only when a failure taught something specific. Never a third attempt on a rung.
-After Pro fails, continue in the calling chat without asking the user to courier
-anything or approve an already authorised fix.
+Read [provider-policy.md](references/provider-policy.md) before external calls.
+Keep restricted data, credentials, money/account operations and work without a
+reliable done-check in the originating parent. Updating this skill itself does
+not require recursively running its cascade.
 
-If a failure came from a demonstrated runner or configuration defect, such as an
-accidental token cap, fix that fault, announce the repair, then restart with
-Flash using the corrected runner. A defect like that is not a model or task
-failure, so it must not justify skipping to Pro or the calling chat once
-repaired. Record all prior costs before restarting. Keep the one-retry limit for
-genuine model or task failures, and do not open an endless repair loop: if the
-same infrastructure fault repeats identically, report it instead of retrying
-silently. The three rungs stay exactly Flash, then Pro, then the current calling
-chat, with no hardcoded rescue name and no separate rescue API.
+## Start and resume
 
-## Coordinator discipline
+Use `scripts/cascade_session.py` to initialise one private directory outside the
+repository. Keep its path in the parent task's progress record. Do not initialise
+a new session just because a task, rung or conversation turn changed.
 
-Planning stays in the calling chat. Never send ownership of the diagnosis,
-implementation plan, scope or success criteria to a worker. Workers may gather
-specified evidence or implement a bounded task, but the caller interprets the
-evidence, makes decisions and judges the result. A request for a plan is handled
-directly by the caller; it does not start the worker cascade or require failed
-worker attempts first. The workflow below applies to implementation after the
-caller has defined the plan and acceptance criteria.
+The short parent-approved brief contains the goal, settled architecture/schema
+choices, constraints, rejected approaches, current plan and runnable done-checks.
+Update it when decisions change. Read [session commands](references/sessions.md)
+for the commands and report format.
 
-Before the initial Flash call, before every retry, before a restart after a
-runner repair, and before any escalation, the coordinator posts a standalone
-bold user-visible banner naming the model or rung taking over. Use these exact
-visible forms:
+For each task:
 
-- Initial start: `--- Starting with Flash ---`
-- Retry on the actual rung: `--- Retrying Flash ---` or `--- Retrying Pro ---`
-- Restart after runner repair: `--- Restarting with Flash ---`
-- External escalation: `--- Escalation to Pro ---`
-- Final escalation: `--- Escalation to <current chat model> ---`, naming the
-  actual current chat model dynamically. Astra is illustrative only and must
-  never be hardcoded.
+1. Establish the baseline and a stable task ID. The parent diagnoses baseline failures.
+   Include current source for the task, relevant changes since the worker last acted,
+   exact scope and acceptance checks. Old conversation code is not current evidence.
+2. Run the existing Flash worker with `--session` and `--task`. A fresh reply filename
+   preserves attempt evidence; it does not create a fresh worker. The runner checks
+   the live provider catalogue, pins an approved endpoint and restores the conversation.
+3. Inspect the proposed edits, apply with `cascade_apply.py`, and run the done-checks.
+   API workers propose edits; they cannot execute tests. Their report is not verification.
+   Record the observed check result, brief failure detail and a stable failure tag.
+4. Feed the result back to the same worker. Allow one attempt and one justified retry
+   per external rung per task. A new task does not erase earlier lessons. Do not rename
+   the same failed task to reset its retry allowance.
+5. If Flash fails, prepare the handover below and resume/start Pro. If Pro fails,
+   the originating parent reads the actual diff and failure evidence, then rescues
+   directly. Never launch a separate expensive coordinator or rescue API call unless
+   the user explicitly configured a host-specific rescue override.
+6. Preserve valid edits. Identify which edits remain applied and which were reverted;
+   do not automatically reset the whole task between rungs. Restore only attributable
+   failed changes and keep unrelated user work. The next worker gets the current state.
+7. Send accepted Pro/parent corrections back as a shared session note before Flash's
+   next assignment. Do not send Flash back into the same unresolved escalated failure.
 
-Make the banner line bold and standalone; for example,
-`**--- Escalation to Pro ---**` renders as the exact visible form
-`--- Escalation to Pro ---`. Immediately underneath each banner, post one short
-sentence giving the specific previous failure reason and the recorded cost, or
-unknown. A tool log, plain tool output or the final report alone does not
-satisfy this. Never move silently to the next model, and never continue
-implementation on the calling model without announcing it first.
+The runner and applier reject stale revisions. Coordinate writes when using two
+workers; parallel edits in one checkout can invalidate another proposal. Rebase the
+brief/source and resume the same worker, never silently apply stale output.
 
-While this skill is executing delegated application work, the coordinator
-writes prompts, runs the runner and patch applier, runs checks, and judges.
-Application source edits go through the external rungs until both have failed.
-Do not quietly patch a failed external answer to avoid recording an escalation.
-At rung three, the calling chat may edit source directly to finish the task.
+A demonstrated runner/configuration defect is repaired and restarted at Flash,
+using the same saved worker. It does not count as a model failure. Record its cost;
+if the identical infrastructure fault repeats, report it instead of looping.
 
-This restriction governs work delegated through the skill. Editing or installing
-the skill itself does not require invoking its own cascade recursively.
+## Escalation handover
 
-Do not spawn a separate expensive coordinator or rescue model. There is no
-Cursor spend-pool dependency and no requirement for a Codex API credential.
-If a background agent invokes the skill on behalf of a parent chat, it returns
-its failure evidence to that parent. The parent chat's current model performs
-the rescue; the background agent does not choose or launch a replacement.
+The worker returns a short report with its attempted approach, proposed changes
+and remaining problems alongside its edits. The parent adds observed tests/errors,
+rejected approaches and the applied/reverted state. `handoff` assembles the recorded
+reports, checks, current revision and actual working-tree diff without an API call.
 
-## Workflow
+Before handing over, the parent **must read the actual diff and failure output**.
+Include committed changes and untracked files when relevant; the helper's HEAD diff
+alone does not contain them. Pass Pro a relevant handover and current source, not
+an unfiltered copy of the root conversation. A background coordinator hands this
+back to the originating parent for final rescue; it never promotes itself.
 
-1. **Done-check first.** Define a runnable check appropriate to the requested
-   outcome. UI work includes rendered interaction checks. Checks supplement
-   focused inspection of the changed behaviour; a green test alone is not proof
-   that the entire request is complete.
-2. **Baseline.** Run the check before any rung edits. If already failing,
-   separate the existing failure from the requested work. Do not judge a rung
-   against an unexplained broken baseline; use the calling chat to resolve it.
-3. **Snapshot.** Record the targeted files and their contents, including any
-   existing user changes and which paths did not exist. Restore only this run's
-   changes between rungs. Never reset unrelated work or delete agent history.
-4. **Prompt.** Write a self-contained prompt file with the scope, relevant
-   source, exact signatures, insertion anchors, constraints and done-check.
-   Exclude credentials and restricted data. Require only the strict
-   FILE/FIND/REPLACE WITH edit format accepted by `cascade_apply.py`.
-5. **Run Flash, then Pro if needed:**
+## Visible transitions
 
-   ```sh
-   python3 ~/.codex/skills/triple-escalator/scripts/cascade_run.py <model-slug> <prompt-file> <reply-file>
-   python3 ~/.codex/skills/triple-escalator/scripts/cascade_apply.py <repo-root> <reply-file>
-   ```
+Before starting, retrying, restarting or escalating, post the appropriate standalone
+bold banner, followed by one sentence giving the previous failure and recorded
+cost (or unknown). Tool output alone is not the announcement.
 
-   The runner prints provider, cost, tokens and finish reason. API failures,
-   incomplete output, invalid edits and failed done-checks are rung evidence.
-   The applier validates all edit blocks before writing. Restore the snapshot
-   after a failed check before retrying or escalating. Keep edits within scope.
-6. **Judge.** Ship, retry with the newly learned detail, or escalate. Before any
-   retry or escalation, post the required standalone bold banner naming the
-   model taking over and, for a retry or escalation, one short sentence with the
-   previous failure reason and the recorded cost, or unknown. Read focused
-   failures and changed sections, not entire transcripts. Preserve any required
-   independent review and release checks.
-7. **Rescue in the calling chat.** Restore the snapshot, retain the useful
-   failure findings, and have the current chat model implement and verify the
-   fix directly. Do not call OpenRouter, the OpenAI/Codex API, Cursor API, or a
-   hardcoded Fable/Astra subagent for rung three. Do not recursively invoke this
-   skill for the rescue or stop at a handoff report when the caller can continue.
-8. **Report.** State rungs used, recorded OpenRouter cost per rung and final
-   verification. Report unknown cost as unknown. Rung three uses the existing
-   chat's normal usage, not a separate external inference charge. Mention the
-   OpenRouter balance if below $5, using `GET https://openrouter.ai/api/v1/credits`.
+- `**--- Starting with Flash ---**`
+- `**--- Continuing with Flash ---**` for a new task in the same worker
+- `**--- Retrying Flash ---**` or `**--- Retrying Pro ---**`
+- `**--- Restarting with Flash ---**` after a runner repair
+- `**--- Escalation to Pro ---**`
+- `**--- Escalation to <originating parent model> ---**` using the observed identity;
+  if unavailable, say `--- Escalation to originating parent ---` rather than inventing one.
 
-## Work that stays in the calling chat
+## Context and measurements
 
-Keep irreversible actions, security/credential/payment work, restricted data,
-and tasks without a reliable done-check in the calling chat from the start.
-Explain the reason briefly. This exception does not permit a separate frontier
-API call and does not override the user's existing approval boundaries.
+When context gets unwieldy, the parent writes a concise checkpoint preserving the
+settled decisions, rejected approaches, feedback, current revision, edits and open
+checks. `compact` uses it for future requests while preserving the full journal.
+Do this at a useful task boundary or before capacity exhaustion, not every turn.
+No extra model call is required. Shared notes can be folded into the current brief
+using `brief`; use the documented note checkpoint to avoid resending folded notes.
 
-## Files
+The runner records API-reported input/output tokens, known cost, request duration
+and failed responses. The parent records check results and concise failure tags
+from checks it already ran. `summary` reports repeated tags and wall time to the
+first passing check. Reasoning tokens are part of completion tokens, not added twice.
+Parent usage is separate and unknown unless the host supplies it. Missing usage/cost
+stays unknown. No extra LLM graders, periodic self-analysis, dashboards or benchmark
+reruns solely to fill counters. Inspect the summary at PR completion or when asked.
 
-- `scripts/cascade_run.py`: only the two DeepSeek rungs, through OpenRouter.
-- `scripts/cascade_apply.py`: strict single-match source edits.
-- `references/provider-policy.md`: the local copy of external-routing and data rules.
+Compare similar tasks using total available cost/tokens, elapsed time, repeated
+failures and correctness. Do not claim intelligence gains or savings from the
+existence of metrics. Preserve independent final review required by the repository.
 
-## Output limits and truncated replies
+## Provider limits
 
-The runner reads the selected endpoint's live output capacity and explicitly
-requests that allowance, reserving context space for the input. It adds no fixed
-application token cap. Omitting max_tokens can silently inherit a small provider
-default, and reasoning shares the completion allowance with the answer.
-Flash currently selects morph/fp8; Pro selects azure/us. Use --provider with an
-exact approved endpoint tag (for example baseten/fp4 for Pro) to test another
-route. Each call is pinned so a fallback cannot silently shrink its allowance.
-If the endpoint is unavailable, record that failure; do not weaken the allowlist,
-zero-retention or no-data-collection controls. Model and endpoint limits still
-exist, so an explicit allowance is not a guarantee against truncation. Flash defaults to high reasoning, its second-highest supported effort;
-Pro also uses its supported high level. Use `--reasoning-effort` to pick another
-supported level, such as max for Flash. Check supported efforts in the live
-model catalogue before changing this setting.
-
-`finish_reason: length`, empty content and invalid edit format return a nonzero
-exit code. The usable reply path is written only for a complete, correctly shaped
-answer. A `.meta.json` sidecar records cost, token counts, provider and finish
-reason; partial text is kept separately as `.partial.txt` and must not be applied.
-A complete answer still has to pass the edit helper and the task's done-check.
-Never apply a stale output after a failed command. Use a fresh output path for
-each attempt. Distinguish a task-effort retry, which counts toward the
-one-retry-per-rung limit, from repairing a demonstrated runner fault such as an
-accidental token cap. A runner repair fixes the fault and restarts at Flash with the corrected
-runner after a demonstrated runner repair; it is not a task-effort retry and
-must not be counted as one, though every prior cost is still recorded. Neither kind of retry may restart
-the cascade indefinitely. If the same infrastructure fault repeats identically,
-report it rather than looping. If the provider still truncates an otherwise valid
-attempt, split the work into smaller changes or escalate.
+Flash and Pro default to high reasoning. The runner requests the approved endpoint's
+live output allowance after reserving input context; it adds no fixed application
+output cap. Provider/model limits still exist. Do not weaken the provider allowlist,
+no-data-collection or zero-retention controls to get a response. Truncated, empty or
+invalid replies remain in history but are never usable patches. `--one-shot` is for
+explicit protocol diagnostics only, never the normal implementation path.
