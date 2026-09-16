@@ -33,7 +33,7 @@ Implementation and failed attempts move to cheaper external models. Your main mo
 
 ## Install
 
-Requires macOS, Python 3.10 or later, Git, npm, a coding agent that supports SKILL.md, and your own funded OpenRouter account. No Python packages are required. The coding harness is pinned to OpenCode 1.18.31; the macOS execution boundary must be available. Other operating systems currently fail closed.
+Requires macOS, Python 3.10 or later, Git, npm, a coding agent that supports SKILL.md, and your own funded OpenRouter account. The runner uses deepseek-recipe 0.1.1 for local native token counting. The coding harness is pinned to OpenCode 1.18.31; the macOS execution boundary must be available. Other operating systems currently fail closed.
 
 Download this repository. From its root, copy `triple-escalator` into your agent's skills directory. For Codex:
 
@@ -51,6 +51,8 @@ Install the tested coding harness:
 ```sh
 npm install --prefix "$HOME/.local/share/triple-escalator/runtime" --save-exact opencode-ai@1.18.31
 ```
+
+Install and activate the local native token counter using [session setup](references/sessions.md#setup-macos) before running the Python helpers. It counts chat and tools locally and does not make paid calls.
 
 ### 1. Supply your own API key
 

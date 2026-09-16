@@ -11,6 +11,22 @@ Requires Python 3.10+, Git, npm and macOS `sandbox-exec`. Install the pinned har
 npm install --prefix "$HOME/.local/share/triple-escalator/runtime" --save-exact opencode-ai@1.18.31
 ```
 
+Install the native request counter in an isolated Python environment, then activate
+that environment whenever running the Python helpers:
+
+```sh
+python3 -m venv "$HOME/.local/share/triple-escalator/tokenizer-runtime"
+source "$HOME/.local/share/triple-escalator/tokenizer-runtime/bin/activate"
+python3 -m pip install deepseek-recipe==0.1.1
+python3 "$SKILL/scripts/cascade_tokens.py" --setup
+```
+
+Setup downloads checksum-pinned official Flash and Pro tokenizers. Request counting
+is local and includes chat framing, tool definitions and results. It uses the native
+template, rather than treating bytes as tokens or assuming a characters-per-token
+ratio. Provider-specific framing may differ; billed usage still comes only from
+the API. Unsupported input fails before sending. No worker history is discarded.
+
 The installed binary is checked before each run. Credentials remain in the parent
 process via `OPENROUTER_API_KEY`; public installations use environment-based keys.
 Configure approved providers in `providers.json` or `OPENROUTER_PROVIDER_CONFIG`.

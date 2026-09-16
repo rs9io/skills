@@ -13,6 +13,7 @@ from cascade_session import Session, lock, revision
 import urllib.error
 import urllib.request
 from cascade_apply import parse
+from cascade_tokens import input_tokens
 
 MODELS = {
     "deepseek/deepseek-v4.1-flash": {"effort": "high", "efforts": {"low", "high", "max"}, "provider": "morph/fp8"},
@@ -34,7 +35,7 @@ def provider_config(path):
     return {"only": allowed, "ignore": blocked, "data_collection": "deny", "zdr": True, "allow_fallbacks": True, "require_parameters": True}
 
 
-def output_route(model, provider, tag, messages, catalogue=None):
+def output_route(model, provider, tag, messages, catalogue=None, *, request=None):
     """Use the selected endpoint's live capacity, never an application token cap."""
     base = tag.split("/", 1)[0]
     def includes(slug):
@@ -47,8 +48,10 @@ def output_route(model, provider, tag, messages, catalogue=None):
     endpoints = [e for e in catalogue.get("data", {}).get("endpoints", []) if e.get("tag") == tag]
     if not endpoints:
         raise ValueError("Selected endpoint is absent from the live catalogue.")
-    # Bytes conservatively reserve input space without relying on a guessed tokenizer.
-    input_reserve = len(json.dumps(messages, ensure_ascii=False).encode("utf-8"))
+    # A startup catalogue check has no prompt. Actual calls include native chat
+    # framing, tool schemas and tool results, counted locally without API spend.
+    input_reserve = input_tokens(model, request if request is not None else
+                                 {"model": model, "messages": messages}) if request is not None or messages else 0
     capacities = []
     for endpoint in endpoints:
         maximum, context = endpoint.get("max_completion_tokens"), endpoint.get("context_length")
