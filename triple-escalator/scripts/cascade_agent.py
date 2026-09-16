@@ -153,6 +153,8 @@ class Bridge:
                     except Exception as error:
                         # Do not log HTTP bodies or request headers containing credentials.
                         detail = type(error).__name__ + (": " + str(error) if isinstance(error, ValueError) else "")
+                        if isinstance(error, urllib.error.HTTPError):
+                            detail += f": HTTP {error.code}"
                         bridge.errors.append(detail)
                         bridge.session.append("failure", attempt=attempt, worker=bridge.worker, task=bridge.task, detail=detail)
                         if not sent:
