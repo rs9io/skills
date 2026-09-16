@@ -27,7 +27,10 @@ RUNTIME = Path.home() / ".local/share/triple-escalator/runtime/node_modules/.bin
 POLICY = """You are the persistent coding worker for this PR, not a patch-writing service.
 The original parent owns the plan and acceptance criteria. Read the relevant repository
 instructions and source yourself. Use your file, search, edit and terminal tools to
-implement the task, run its baseline and checks, inspect failures, and repair your work.
+implement the task, run its baseline and acceptance checks, inspect failures, and repair
+these yourself. Self-review the complete diff and the integration between changed
+components. Do not stop at a patch or ask the parent to do routine implementation,
+testing or fixes. Own the work until accessible acceptance checks pass.
 Do not send patches or routine shell work back to the parent. Keep working until the
 agreed checks pass, a real permission barrier is reached, or evidence shows you cannot
 solve it. Repeated identical failures without a new hypothesis mean stop and report.
@@ -38,6 +41,8 @@ Use no other agents or models. No credentials, .env files, private account data,
 production access, external messages, push, merge, deployment, or destructive Git.
 If the task needs any of these, return the precise blocked action to the parent.
 Do not use em dashes in authored prose.
+On completion, deliver evidence of finished work. While unfinished, return only for
+a concrete inability to finish, with attempts, exact failures, current diff and blocker.
 End with a concise report: changed files and approach; exact commands, exit results
 and remaining failures; decisions or scope questions; what the parent must verify.
 A passing local check is not final acceptance. Never claim a test you did not run.
@@ -103,7 +108,7 @@ class Bridge:
                         body = bridge.prepare(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
                         bridge.session.append("request", attempt=attempt, worker=bridge.worker, task=bridge.task,
                                               prompt="Native coding-worker step; transcript in OpenCode session.",
-                                              output_allowance=body["max_tokens"], provider=bridge.tag)
+                                              output_allowance=body["max_tokens"], provider=bridge.tag, reasoning_effort=bridge.effort)
                         bridge.calls += 1
                         sent = True
                         request = urllib.request.Request(ENDPOINT, data=json.dumps(body).encode(), headers={
@@ -185,7 +190,7 @@ def configuration(model, tag, catalogue, url, token):
         "share": "disabled", "autoupdate": False, "snapshot": False,
         "provider": {"openrouter": {"options": {"baseURL": url, "apiKey": token}, "models": {
             model: {"name": model, "limit": {"context": context, "output": output},
-                    "reasoning": True, "tool_call": True, "options": {"reasoning": {"effort": "high"}}}}}},
+                    "reasoning": True, "tool_call": True, "options": {"reasoning": {"effort": MODELS[model]["effort"]}}}}}},
         "agent": {"title": {"disable": True}, "summary": {"disable": True}},
         "permission": {
             "*": "allow", "external_directory": "deny", "task": "deny", "skill": "deny",
@@ -353,13 +358,14 @@ def main():
     parser.add_argument("--opencode", type=Path)
     parser.add_argument("--provider")
     parser.add_argument("--read-dir", type=Path, action="append", default=[], help="Specific additional read-only dependency directory approved by the parent")
-    parser.add_argument("--reasoning", default="high")
+    parser.add_argument("--reasoning", help="Defaults to the model policy: Flash max; legacy Pro high")
     parser.add_argument("--timeout", type=int, default=3600, help="Wall-time stop in seconds, preserves session for resume")
     parser.add_argument("--budget", type=float, help="Optional known-dollar canary stop between requests; not a token cap")
     args = parser.parse_args()
     model = "deepseek/deepseek-v4-pro" if args.worker == "pro" else "deepseek/deepseek-v4.1-flash"
     if args.timeout <= 0 or (args.budget is not None and args.budget <= 0):
         parser.error("Timeout and optional budget must be positive")
+    args.reasoning = args.reasoning or MODELS[model]["effort"]
     if args.reasoning not in MODELS[model]["efforts"]:
         parser.error("Unsupported reasoning effort for selected worker")
     try:

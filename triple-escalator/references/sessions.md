@@ -1,7 +1,9 @@
 # Coding workers: setup and commands
 
-Version 0.9 uses parent-selected workers in a real coding harness. The parent writes a plan and checks the
-result; workers read/edit files and run their own terminal/test/fix loops.
+Version 1.0 uses one persistent Flash coding worker at max reasoning. The parent
+writes a plan that covers component interactions and acceptance. Flash implements,
+self-reviews, tests and repairs the work before returning a completion report.
+Unfinished work returns only for a concrete blocker or inability to finish.
 
 ## Setup (macOS)
 
@@ -34,7 +36,7 @@ No API key is copied into the child process or its config. Its only provider rou
 is a temporary authenticated loopback adapter owned by the runner.
 
 The adapter verifies the live provider catalogue and enforces pinned routing,
-`data_collection: deny`, ZDR, high reasoning and the full usable output allowance
+`data_collection: deny`, ZDR, max reasoning for Flash and the full usable output allowance
 on every request, including harness helper calls. Other models are refused.
 
 ## Start a PR session
@@ -46,7 +48,7 @@ progress record. Use a task-specific path, not a new directory per turn.
 python3 "$SKILL/scripts/cascade_session.py" init /private/path/pr-session \
   --repo /path/to/worktree --parent original-conversation-reference \
   --parent-model inherit --file /private/path/parent-plan.md
-python3 "$SKILL/scripts/cascade_agent.py" pro /private/path/task.md \
+python3 "$SKILL/scripts/cascade_agent.py" flash /private/path/task.md \
   --session /private/path/pr-session --task issue-123
 ```
 
@@ -64,9 +66,8 @@ before dispatch. `--read-dir /specific/dependency/directory` adds an approved
 read-only path for existing dependencies outside the checkout. It does not grant
 network access. Local servers may listen; external browsing remains a parent task.
 
-A second generalist worker is an exception. Use a separate checkout and PR-scoped
-session path with the same plan/decisions; initialise it with `--second-worker` and
-select `flash-2`. Share accepted corrections, never concurrent writes in one checkout.
+Reuse one Flash worker for the workstream. Do not initialise a second worker or
+invoke a retained Pro session. Historical sessions remain available for audit.
 
 ## Review, resume and return to the parent
 
@@ -78,7 +79,7 @@ acceptance or a concrete failure:
 python3 "$SKILL/scripts/cascade_session.py" parent-check /private/path/pr-session \
   --task issue-123 --result fail --failure-tag wrong-pack-basis \
   --detail 'Observed regression: six-pack price treated as single bottle'
-python3 "$SKILL/scripts/cascade_agent.py" pro /private/path/feedback.md \
+python3 "$SKILL/scripts/cascade_agent.py" flash /private/path/feedback.md \
   --session /private/path/pr-session --task issue-123
 ```
 
@@ -95,11 +96,9 @@ python3 "$SKILL/scripts/cascade_session.py" handoff /private/path/pr-session \
   --task issue-123 > /private/path/handoff.json
 ```
 
-`handoff` exports evidence to the parent; it never launches another worker.
-The parent reads the actual diff and report and finishes the work. Do not dispatch
-Pro because Flash failed, or Flash because Pro failed. Pro is selected directly for
-new work by default. For a new mechanical task the parent may explicitly use `flash`
-in the same command instead of `pro`, reusing its native binding if one exists.
+`handoff` exports unfinished-work evidence to the parent; it never launches another
+worker. Failure returns directly to the originating parent, never through Pro.
+Review corrections go to the same Flash session for implementation and retesting.
 The report excludes committed changes from its HEAD diff and does not include
 untracked file contents; inspect those separately.
 
@@ -129,9 +128,12 @@ python3 "$SKILL/scripts/cascade_session.py" close /private/path/pr-session \
 A worker has a one-hour wall-time stop by default (`--timeout` changes seconds); its
 history remains available for resume. This is not a token limit.
 
-A canary can use `--budget 0.25` to stop before another request once known cost reaches
-that amount, or cost is unknown. This is a between-request stop, not a hard bill cap:
-an in-flight request can exceed it. It never reduces token output allowance.
+Omit `--budget` for ordinary coding work and routing benchmarks. Do not add a small
+arbitrary cutoff that interrupts implementation or checks. The optional `--budget`
+exists for an explicit user-set worker spending limit. It stops between requests
+once known cost reaches that amount or billing is unknown; an in-flight request
+can exceed it. It never reduces token output allowance. Monitor spend and stop
+actual failure loops instead of forcing repeated budget pauses.
 
 Close preserves every transcript and prevents new dispatches. There is no idle
 worker process or paid background polling. A running call must be supervised by its

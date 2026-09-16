@@ -7,10 +7,10 @@ Cursor Origin (login): https://cursor.com/codebase/rs9io/skills
 
 ## triple-escalator
 
-The parent chooses a persistent coding worker: DeepSeek Pro by default, or Flash
-for small mechanical work. The worker implements, tests and returns directly to
-the parent for review or rescue. No Flash-to-Pro ladder. Sessions and cost logs
-persist through the PR; no separate rescue API call or fixed final model.
+The parent plans how the parts fit together. One persistent DeepSeek Flash coding
+worker at max reasoning implements, self-reviews, tests and repairs the work.
+Unfinished work returns directly to the parent only when Flash cannot finish.
+Sessions and cost logs persist; Pro is outside the active route.
 
 [Install Triple Escalator](triple-escalator/README.md). Bring your own OpenRouter
 API key and configure your allowed and blocked providers before running it.
