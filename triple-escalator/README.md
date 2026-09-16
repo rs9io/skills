@@ -1,12 +1,16 @@
 # Triple Escalator
 
-A Codex skill that puts cheaper models to work before spending more of your main chat's tokens.
+A skill for Codex, Claude Code and Cursor that keeps cheaper workers on the same PR until the work is finished.
 
 **DeepSeek Flash on OpenRouter → DeepSeek Pro on OpenRouter → your current chat model.**
 
 Flash handles the implementation. If its result fails the agreed checks, Pro gets a turn. If both fail, the model already running your chat finishes the work directly. There is no separate frontier API call or fixed rescue-model name.
 
-The agent drives the workflow: define a done-check, save the starting files, prompt a rung, apply its proposed edits, verify, and retry or escalate. The Python scripts handle individual API calls and edits. They are not a standalone autonomous service.
+The original parent owns the plan and acceptance checks. One generalist Flash worker keeps its conversation through tasks, retries and corrections. Pro gets its own reusable conversation when needed. The parent reads the actual diff and failure evidence before each escalation, and passes accepted corrections back to Flash.
+
+The Python scripts save conversation journals and apply proposed edits. The agent still runs the checks and judges the result. Workers have no background process or idle API cost. Persistence means saved context, not model training.
+
+Version 0.7.0 adds persistent sessions and passive measurements. A host-specific rescue override is allowed, such as choosing Fable for Cursor while Codex and Claude return to their original parent. Public installations inherit their original parent unless their user configures an override.
 
 ## What you will see
 
@@ -29,7 +33,7 @@ Implementation and failed attempts move to cheaper external models. Your main mo
 
 ## Install
 
-Requires Python 3.10 or later, a coding agent that supports SKILL.md, and your own funded OpenRouter account. No Python packages are required.
+Requires macOS or Linux, Python 3.10 or later, Git, a coding agent that supports SKILL.md, and your own funded OpenRouter account. No Python packages are required.
 
 Download this repository. From its root, copy `triple-escalator` into your agent's skills directory. For Codex:
 
@@ -37,6 +41,8 @@ Download this repository. From its root, copy `triple-escalator` into your agent
 mkdir -p ~/.codex/skills
 cp -R ./triple-escalator ~/.codex/skills/triple-escalator
 ```
+
+For Claude Code use `~/.claude/skills/triple-escalator`; for Cursor use `~/.cursor/skills/triple-escalator`. Keep independent copies where host policies differ.
 
 If that destination already exists, move your old copy aside first. Install in one discovery location only; a second link in `~/.agents/skills` can produce a duplicate skill entry. Reopen the agent's skill picker or start a new chat to refresh discovery.
 
@@ -85,7 +91,15 @@ Ask your coding agent:
 
 > Use triple-escalator to fix this issue. Define the done-check first, start with Flash, try Pro if Flash fails, and finish in this chat if both fail. Preserve my existing changes and report the checks and cost per rung.
 
+The parent creates one session directory **outside the repository**, records its path, and resumes it for later tasks. Application calls require `--session` and a stable `--task` ID; `--one-shot` is reserved for protocol diagnostics. Follow [session commands](references/sessions.md) for initialisation, feedback, handovers and compaction. Closing a session preserves its journal.
+
 Start with a small task and inspect the diff and results. Irreversible actions, payment or credential work, restricted data, and tasks without a reliable done-check stay in the calling chat, subject to your usual approvals.
+
+## Measurements without extra model calls
+
+Each request records API-reported input/output tokens and cost. Existing checks supply pass/fail results and short failure tags. A local summary counts repeated mistakes and elapsed time from the first external request to the first passing check for each task. Reasoning tokens are not counted twice. Missing usage stays unknown; parent-chat usage is separate and is not measured by this runner.
+
+Read the summary at PR completion or when requested. There are no model graders, benchmark reruns or dashboards. These counters make comparison possible; they do not prove savings by themselves. Long histories also cost input tokens, so the parent can write a concise checkpoint while the original journal remains intact.
 
 ## Output and reasoning
 
@@ -110,7 +124,7 @@ A provider allowlist is a routing control. A company's country of ownership does
 
 OpenRouter documents separate [provider-routing controls](https://openrouter.ai/docs/guides/routing/provider-selection) and [zero-data-retention policies](https://openrouter.ai/docs/guides/features/zdr). ZDR does not mean the data stays on your machine, and OpenRouter permits some in-memory caching within its definition. Review OpenRouter's own privacy settings as well as the downstream provider's terms.
 
-Keep credentials, customer records, proprietary pricing and other restricted material out of delegated prompts unless the chosen service and workflow are approved for it. The runner sends the prompt file you give it; it is not a sensitive-data scanner. The calling chat is also a hosted service with its own policies.
+Keep credentials, customer records, proprietary pricing and other restricted material out of delegated prompts unless the chosen service and workflow are approved for it. The runner sends the current prompt and restored worker context, including the parent brief and shared corrections; it is not a sensitive-data scanner. The calling chat is also a hosted service with its own policies.
 
 ## Verify the package locally
 
