@@ -7,7 +7,7 @@ Cursor Origin (login): https://cursor.com/codebase/rs9io/skills
 
 ## triple-escalator
 
-DeepSeek Flash on OpenRouter does the implementation. If its checks fail,
+DeepSeek Flash on OpenRouter runs a persistent coding agent with file and terminal tools to implement, test and repair the work. If its checks fail,
 DeepSeek Pro gets a turn. If both fail, the model already running your chat
 finishes the work directly. No separate rescue API call, no hardcoded final model.
 

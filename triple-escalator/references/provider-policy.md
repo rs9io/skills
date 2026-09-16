@@ -9,6 +9,6 @@ Before running an external rung, confirm the user has set their own `OPENROUTER_
 - Keep API keys, tokens, environment files and restricted business or personal data out of prompts. The runner does not inspect content for secrets.
 - Send only the files and context needed for the bounded task, rather than an entire repository or chat transcript.
 - For strict regional-processing requirements, require a separately verified in-region service configuration. This runner uses the standard OpenRouter API endpoint and does not promise regional processing.
-- Rung three is direct work in the calling chat under that service's own policies. It is not local/offline inference and is not another external rung.
+- Rung three returns to the original parent under its service policies, or the user's explicit host rescue override. It is not local/offline inference or an automatic extra OpenRouter rung.
 
 Official references: [routing](https://openrouter.ai/docs/guides/routing/provider-selection), [retention](https://openrouter.ai/docs/guides/features/zdr), [regional processing](https://openrouter.ai/docs/guides/features/sovereign-ai).

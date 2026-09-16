@@ -1,109 +1,126 @@
-# Persistent session commands
+# Coding workers: setup and commands
 
-All paths below are examples. Set `SKILL` to this installed skill's absolute directory
-and `SESSION` to a new directory outside the repository, such as
-`~/.local/state/triple-escalator/project-pr-123`. Reuse it until the PR is done.
-Python 3.10+ and a POSIX host (macOS/Linux) are required. No daemon or database.
+Version 0.8 uses a real coding harness. The parent writes a plan and checks the
+result; workers read/edit files and run their own terminal/test/fix loops.
 
-The journal contains only briefs/prompts/results you intentionally send and local
-check observations. It never reads or exports your root chat automatically. Apply
-the same data policy to later notes and checkpoints as to the first prompt.
+## Setup (macOS)
+
+Requires Python 3.10+, Git, npm and macOS `sandbox-exec`. Install the pinned harness:
 
 ```sh
-python3 "$SKILL/scripts/cascade_session.py" init "$SESSION" \
-  --repo /absolute/checkout --parent ORIGINAL_CONVERSATION_REFERENCE \
-  --parent-model inherit --file /tmp/approved-brief.txt
+npm install --prefix "$HOME/.local/share/triple-escalator/runtime" --save-exact opencode-ai@1.18.31
 ```
 
-Use an observed model identity instead of `inherit` when available. It is metadata,
-not a model-routing slug. Add `--second-worker` only when a second generalist is
-justified. The workers are `flash`, optional `flash-2`, and lazy `pro`.
+The installed binary is checked before each run. Credentials remain in the parent
+process via `OPENROUTER_API_KEY`; public installations use environment-based keys.
+Configure approved providers in `providers.json` or `OPENROUTER_PROVIDER_CONFIG`.
+No API key is copied into the child process or its config. Its only provider route
+is a temporary authenticated loopback adapter owned by the runner.
+
+The adapter verifies the live provider catalogue and enforces pinned routing,
+`data_collection: deny`, ZDR, high reasoning and the full usable output allowance
+on every request, including harness helper calls. Other models are refused.
+
+## Start a PR session
+
+Keep the session directory outside the checkout and retain its path in the parent's
+progress record. Use a task-specific path, not a new directory per turn.
 
 ```sh
-python3 "$SKILL/scripts/cascade_run.py" deepseek/deepseek-v4.1-flash \
-  /tmp/task.txt "$SESSION/reply-001.txt" --session "$SESSION" --task issue-123
-python3 "$SKILL/scripts/cascade_apply.py" /absolute/checkout "$SESSION/reply-001.txt"
+python3 "$SKILL/scripts/cascade_session.py" init /private/path/pr-session \
+  --repo /path/to/worktree --parent original-conversation-reference \
+  --parent-model inherit --file /private/path/parent-plan.md
+python3 "$SKILL/scripts/cascade_agent.py" flash /private/path/task.md \
+  --session /private/path/pr-session --task issue-123
 ```
 
-The next assignment or retry uses the same session and worker, with a fresh reply
-filename. Keep the same task ID across retries/escalation. Use a new task ID for a
-new bounded task within this PR. Pro uses its model slug and `--worker pro`.
+The task contains the goal, relevant pointers, scope and checks. Do not paste every
+source file or instruct the parent to apply the worker's edits. Workers read current
+source, discover repository instructions, edit and test themselves. The runner
+prints a report with the persistent native session ID, log path, before/after
+revision and actual API cost. Native transcripts live under `session/coding/data`;
+per-run command/tool events and reports live under `session/coding/<run-id>`.
 
-Read `attempt_id` from the reply's `.meta.json`, inspect the diff, then run the checks
-in the repository. Record their actual result, including failed application:
+A run may inspect, edit, fail tests, fix and retest without a parent turn between
+steps. A permission denial must be reported as a boundary, not worked around.
+The process has no general outbound network: install dependencies with the parent
+before dispatch. `--read-dir /specific/dependency/directory` adds an approved
+read-only path for existing dependencies outside the checkout. It does not grant
+network access. Local servers may listen; external browsing remains a parent task.
+
+A second generalist worker is an exception. Use a separate checkout and PR-scoped
+session path with the same plan/decisions; initialise it with `--second-worker` and
+select `flash-2`. Share accepted corrections, never concurrent writes in one checkout.
+
+## Review, resume and escalate
+
+Inspect the actual diff (including committed changes since the task baseline),
+relevant tool output and result. `returned` is not a pass verdict. Record parent
+acceptance or a concrete failure:
 
 ```sh
-python3 "$SKILL/scripts/cascade_session.py" check "$SESSION" \
-  --attempt ATTEMPT_ID --result fail --failure-tag schema-v1 \
-  --detail 'Schema v1 returned despite the schema v2 decision; migration test failed.'
+python3 "$SKILL/scripts/cascade_session.py" parent-check /private/path/pr-session \
+  --task issue-123 --result fail --failure-tag wrong-pack-basis \
+  --detail 'Observed regression: six-pack price treated as single bottle'
+python3 "$SKILL/scripts/cascade_agent.py" flash /private/path/feedback.md \
+  --session /private/path/pr-session --task issue-123
 ```
 
-For success use `--result pass` and omit the failure tag. Tags are parent-assigned
-identifiers for the same observed mistake, not an LLM's opinion. Only one check
-record is allowed per external attempt, preventing accidental double counting.
-Record the combined acceptance verdict once; individual test logs stay in their
-normal files. For parent rescue, use `parent-check --task ... --result ... --detail ...`.
-It contributes passing-check time but invents no parent token count or API spend.
+The second command resumes the same native session. Never use `--fork` or wipe
+history to retry. If a run was interrupted, inspect its logs and working tree before
+resuming; don't assume its edits rolled back. Only a successfully recorded native
+binding may be resumed automatically; investigate any interrupted first-run binding.
 
-Share a correction with both workers:
+When escalation is justified, announce it and assemble the handover:
 
 ```sh
-python3 "$SKILL/scripts/cascade_session.py" note "$SESSION" --file /tmp/correction.txt
+python3 "$SKILL/scripts/cascade_session.py" handoff /private/path/pr-session \
+  --task issue-123 > /private/path/handoff.json
+python3 "$SKILL/scripts/cascade_agent.py" pro /private/path/pro-task.md \
+  --session /private/path/pr-session --task issue-123
 ```
 
-Before escalation, assemble and read the handover:
+The parent reads the handover and diff, then writes `pro-task.md` with the relevant
+failed approaches, retained edits, check evidence and acceptance goal. It need not
+copy entire files. Handoff includes coding reports and tool-result excerpts; full
+logs remain linked. Its HEAD diff excludes committed edits and untracked contents,
+which the parent must also inspect. Pro reuses its own native session on later runs.
+
+After a Pro or parent fix, send accepted corrections back to the workers:
 
 ```sh
-python3 "$SKILL/scripts/cascade_session.py" handoff "$SESSION" \
-  --task issue-123 > "$SESSION/handoff-001.json"
+python3 "$SKILL/scripts/cascade_session.py" note /private/path/pr-session \
+  --file /private/path/accepted-correction.md
+python3 "$SKILL/scripts/cascade_session.py" brief /private/path/pr-session \
+  --file /private/path/current-plan.md --fold-notes
 ```
 
-The helper includes untrusted worker reports, observed checks and the actual HEAD
-diff/status. The parent reads the diff and failure logs, adds relevant committed or
-untracked changes, and prepares the next task prompt. Use the relevant parts in Pro's
-first prompt. Do not repeatedly paste the full handover into shared notes; those
-are for concise accepted decisions and corrections.
+Use the second command when the brief incorporates older notes. It stops replaying
+those notes without deleting them. Native OpenCode compaction manages tool history;
+the legacy `compact` command only affects v0.7 patch conversations.
 
-Replace the current brief when decisions change. To fold accumulated shared notes
-into it, use `brief --file /tmp/current-brief.txt --fold-notes` after checking the
-brief preserves those decisions. Notes remain in the archive.
+## Finish and measure
 
 ```sh
-python3 "$SKILL/scripts/cascade_session.py" brief "$SESSION" --file /tmp/current-brief.txt
-python3 "$SKILL/scripts/cascade_session.py" compact "$SESSION" \
-  --worker flash --file /tmp/parent-approved-checkpoint.txt
+python3 "$SKILL/scripts/cascade_session.py" parent-check /private/path/pr-session \
+  --task issue-123 --result pass --detail 'Acceptance checked against current diff'
+python3 "$SKILL/scripts/cascade_session.py" summary /private/path/pr-session
+python3 "$SKILL/scripts/cascade_session.py" close /private/path/pr-session \
+  --detail 'PR merged and acceptance verified'
 ```
 
-Compaction is parent-authored, explicit and per worker. It never deletes history.
-The next request includes the current brief and checkpoint instead of older worker
-messages. Pro retains its own conversation independently.
+A worker has a one-hour wall-time stop by default (`--timeout` changes seconds); its
+history remains available for resume. This is not a token limit.
 
-```sh
-python3 "$SKILL/scripts/cascade_session.py" summary "$SESSION"
-python3 "$SKILL/scripts/cascade_session.py" close "$SESSION" --detail 'PR merged and verified'
-```
+A canary can use `--budget 0.25` to stop before another request once known cost reaches
+that amount, or cost is unknown. This is a between-request stop, not a hard bill cap:
+an in-flight request can exceed it. It never reduces token output allowance.
 
-Closing refuses new API work while retaining the journal and metrics. Do not delete
-session history. Local errors before an API request are not counted as paid calls;
-requests with unknown billing are reported as unknown. Times to first pass include
-waiting between attempts, not just model computation.
+Close preserves every transcript and prevents new dispatches. There is no idle
+worker process or paid background polling. A running call must be supervised by its
+parent; don't end the parent task while it is still running without a resume path.
 
-## Worker response
+## Legacy path
 
-The runner requires this concise header for persistent workers, then passes only
-edit blocks to the existing strict applier:
-
-```text
-REPORT:
-{"attempted":"Used the agreed schema v2","changes":"Updated migration mapping","remaining":["Parent must run the migration tests"]}
-EDITS:
-FILE: src/example.py
-FIND:
-old_value
-REPLACE WITH:
-new_value
-```
-
-A blocked worker leaves EDITS empty and explains why in `remaining`. The runner
-records its report as a failed attempt, without producing a usable patch. Reports
-never count as executed checks. API keys and provider headers are not journalled.
+`cascade_run.py` and `cascade_apply.py` remain for old evidence and explicit protocol
+diagnostics. They are not full coding agents. Do not use them for application work.
