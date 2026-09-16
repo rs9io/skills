@@ -5,7 +5,7 @@ description: >-
   tests a clear parent-authored plan. Real failures return directly to the original
   parent. Use for triple escalator or double escalation.
 metadata:
-  version: "1.1.0"
+  version: "1.1.1"
 ---
 
 # Triple Escalator
@@ -119,30 +119,35 @@ blocker, escalation or returned result; do not generate commentary-only model ca
 
 ## Visible supervision and completion
 
-An external OpenCode process does not automatically appear as a native host agent.
-A saved resume path alone does not wake the parent. Do not leave the user to poll.
+An external OpenCode process does not automatically become a native host agent.
+A saved resume path is recovery information, not completion notification.
 
-For Codex, use one named native supervisor for the existing Flash process when
-native agents are available. This is a lifecycle wrapper, not a second coding
-worker: it starts or attaches to the same persistent Flash session, watches local
-process/report evidence, and returns the result to the parent. It must not edit
-application code, plan, review, call another model, or create another Flash session.
-The parent does useful independent work while it runs. Use shell waits for
-monitoring, not repeated reasoning calls. The native task provides a visible
-running/completed entry in the host's agent list.
+In Codex, give one persistent native Luna supervisor the lifecycle task when Luna
+is available. It launches or attaches to the existing Flash runner, awaits its
+process completion, and returns the report through the native agent channel. This
+is a lightweight wrapper, not another coding worker: it never implements, reviews,
+replans, forks Flash, or calls another worker model. Keep its prompt short and reuse
+it for subsequent runs. All coding context stays in the one native Flash session.
 
-Keep the parent active until the completion arrives. If the turn must end while
-work continues, first register a supported host heartbeat to resume this original
-conversation on completion, failure or required input. Keep it quiet on unchanged
-state, record the exact session/run and next step, and pause it once handled. Never
-claim a background process alone will wake the parent. Other hosts should use their
-supported background-task completion notification; if unavailable, stay attached.
+The parent MUST keep its turn active until the supervisor returns. Do independent
+work while Flash runs, then use the host's native agent wait/event tool. The
+supervisor waits on the process with shell/tool waits, with no reasoning calls or
+status messages for unchanged state. Completion triggers the native child result;
+the parent immediately handles it and continues review, correction or release.
+Do not end with a final answer saying work is running and expect a child result
+to restart an idle parent. Do not replace this handoff with scheduled polling or a
+heartbeat. Use scheduling only if the user explicitly wants work at a later time.
+If the host cannot provide an event-driven handoff, remain attached to the process
+and explain that limitation rather than inventing UI or notification support.
 
-The runner emits a metadata-only status line on stderr at start, every 30 seconds,
-and at exit. Each run also has `status.json` with provider, elapsed time, call count,
-known cost and last completed tool type. `report.json` is the completion evidence;
-a stale running status is not proof of a live process. Do not log prompt or tool
-contents to the status display or label local completion as parent acceptance.
+The native task is the host's available activity surface. Do not claim the user can
+see a particular card, spinner or agent list without verifying that UI. State the
+actual lifecycle: running, returned pending review, failed, or accepted. The runner
+also emits metadata-only stderr at start, every 30 seconds, and exit. Its status.json
+records provider, elapsed time, requests, cost and last tool type. This diagnostic
+output is not a substitute for native completion. report.json is the completion
+evidence; a stale running status is not proof of life. Never put prompts or tool
+contents in status output or label a local worker return as parent acceptance.
 
 ## Context and measurement
 
