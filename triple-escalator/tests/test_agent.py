@@ -10,7 +10,7 @@ import urllib.request
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'scripts'))
-from cascade_agent import Bridge, child_environment, configuration
+from cascade_agent import Bridge, child_environment, configuration, terminate_group
 from cascade_session import Session
 from cascade_sandbox import profile
 from http.server import ThreadingHTTPServer
@@ -112,6 +112,22 @@ class CodingAgentTests(unittest.TestCase):
         h=self.session.handoff('test')
         self.assertEqual(h['coding_results'][0]['report'],'Fixed Decimal')
         self.assertIn('Ran 6 tests',h['worker_tools'][0]['output_excerpt'])
+
+    def test_watchdog_kills_term_ignoring_worker(self):
+        proc=subprocess.Popen([sys.executable,'-c','import signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); print("ready",flush=True); time.sleep(30)'],stdout=subprocess.PIPE,text=True,start_new_session=True)
+        self.assertEqual(proc.stdout.readline().strip(),'ready')
+        terminate_group(proc,grace=0.1)
+        self.assertIsNotNone(proc.poll())
+        proc.stdout.close()
+
+    def test_cleanup_kills_descendant_after_leader_exit(self):
+        code='import os,signal,time; child=os.fork(); exit(0) if child else None; signal.signal(signal.SIGTERM,signal.SIG_IGN); print("child ready",flush=True); time.sleep(30)'
+        proc=subprocess.Popen([sys.executable,'-c',code],stdout=subprocess.PIPE,text=True,start_new_session=True)
+        self.assertEqual(proc.stdout.readline().strip(),'child ready')
+        proc.wait(timeout=5)
+        terminate_group(proc,grace=0.1)
+        self.assertEqual(proc.stdout.read(),'')
+        proc.stdout.close()
 
     @unittest.skipUnless(sys.platform=='darwin','macOS sandbox')
     def test_real_sandbox_repo_access_secret_and_outside_denial(self):

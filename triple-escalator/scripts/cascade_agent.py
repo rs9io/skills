@@ -200,6 +200,29 @@ def child_environment(path, config):
     return env
 
 
+def terminate_group(proc, grace=10):
+    """Stop only this run's process group, including descendants after leader exit."""
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        proc.wait()
+        return
+    deadline = time.monotonic() + grace
+    while time.monotonic() < deadline:
+        proc.poll()  # reap an exited leader without losing the group identity
+        try:
+            os.killpg(proc.pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.05)
+    else:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    proc.wait()
+
+
 def run(args):
     session = Session(args.session)
     worker = args.worker
@@ -264,9 +287,8 @@ def run(args):
             proc = subprocess.Popen(command, cwd=session.meta["repo"], env=env, stdout=subprocess.PIPE,
                                     stderr=stderr, text=True, start_new_session=True)
             def expire():
-                if proc.poll() is None:
-                    failures.append("Worker wall-time limit reached; inspect evidence and resume the same session.")
-                    os.killpg(proc.pid, signal.SIGTERM)
+                failures.append("Worker wall-time limit reached; inspect evidence and resume the same session.")
+                terminate_group(proc)
             watchdog = threading.Timer(args.timeout, expire)
             watchdog.daemon = True
             watchdog.start()
@@ -305,12 +327,10 @@ def run(args):
     finally:
         if watchdog:
             watchdog.cancel()
-        if proc and proc.poll() is None:
-            os.killpg(proc.pid, signal.SIGTERM)
-            try:
-                proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                os.killpg(proc.pid, signal.SIGKILL); proc.wait()
+        if proc:
+            terminate_group(proc)
+        if watchdog and watchdog.is_alive():
+            watchdog.join()
         server.shutdown(); server.server_close(); thread.join()
         ownership.close()
 
