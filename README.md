@@ -43,6 +43,14 @@ cp -R graph ~/.kimi-code/skills/graph
 
 Then invoke `/graph` on a real workflow. Ask it for the diagram, the node contracts, and one executable tracer path. Do not accept a pretty flowchart as the deliverable.
 
+## session-telemetry
+
+Where are we up to?
+
+Run ten agent sessions at once and you lose the thread of every one. This gives each long session one live page at `localhost:4200`: where it's up to, what's next, what's waiting on you, every step grouped by what you asked for, questions with the default the agent is running with, deliverables, and check-backs that come due. It updates live, every time comes from the real clock, and it restarts itself if it crashes.
+
+[Install session-telemetry](session-telemetry/README.md). One command on macOS or Linux, and it needs Node 20+.
+
 ## What this repo is
 
 A public shelf for skills we would use on a client job tomorrow. Not a dump of every prompt we have bookmarked.
